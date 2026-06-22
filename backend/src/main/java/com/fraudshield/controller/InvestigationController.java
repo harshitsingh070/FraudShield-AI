@@ -1,6 +1,7 @@
 package com.fraudshield.controller;
 
 import com.fraudshield.domain.MuleAccount;
+import com.fraudshield.dto.SharedMuleLink;
 import com.fraudshield.model.graph.PhoneNumber;
 import com.fraudshield.repository.FraudRingRepository;
 import com.fraudshield.repository.MuleAccountRepository;
@@ -33,7 +34,7 @@ public class InvestigationController {
      * Returns mule accounts that are connected to > 1 FraudRing.
      */
     @GetMapping("/cross-ring-links")
-    public ResponseEntity<List<MuleAccount>> getCrossRingLinks() {
+    public ResponseEntity<List<SharedMuleLink>> getCrossRingLinks() {
         log.info("Fetching cross-ring mule account links");
         return ResponseEntity.ok(muleAccountRepository.findSharedAcrossRings());
     }

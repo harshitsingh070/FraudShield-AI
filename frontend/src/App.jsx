@@ -123,7 +123,7 @@ export default function App() {
               </h1>
           </div>
           <div className="flex gap-4">
-              <div className={\`text-xs font-mono px-3 py-1 border rounded-md \${dbStatus === 'ONLINE' ? 'bg-slate-800 border-slate-700 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-500'}\`}>
+              <div className={`text-xs font-mono px-3 py-1 border rounded-md ${dbStatus === 'ONLINE' ? 'bg-slate-800 border-slate-700 text-emerald-400' : 'bg-amber-950 border-amber-800 text-amber-500'}`}>
                 DB: {dbStatus === 'ONLINE' ? 'ONLINE' : 'OFFLINE (MOCK MODE)'}
               </div>
               <div className="text-xs font-mono px-3 py-1 bg-slate-800 border border-slate-700 rounded-md text-slate-400">LOC: DELHI NCR</div>
@@ -194,7 +194,7 @@ export default function App() {
                           eventHandlers={{
                             click: () => {
                               setSelectedRing(ringId);
-                              setCopilotHtml(\`<span class="text-amber-400">Target locked: \${ringId}. Ready for AI synthesis.</span>\`);
+                              setCopilotHtml(`<span class="text-amber-400">Target locked: ${ringId}. Ready for AI synthesis.</span>`);
                             }
                           }}
                         >
@@ -234,7 +234,7 @@ export default function App() {
                                     <div className="text-xs font-bold text-slate-200">{name}</div>
                                     <div className="text-[9px] text-slate-500 font-mono mt-0.5">{type}</div>
                                 </div>
-                                <div className={\`text-xs font-bold font-mono px-2 py-1 rounded bg-slate-900 border \${score >= 8 ? 'border-rose-900 text-rose-500' : 'border-orange-900 text-orange-500'}\`}>
+                                <div className={`text-xs font-bold font-mono px-2 py-1 rounded bg-slate-900 border ${score >= 8 ? 'border-rose-900 text-rose-500' : 'border-orange-900 text-orange-500'}`}>
                                     {score.toFixed(1)}
                                 </div>
                             </div>
@@ -260,7 +260,7 @@ export default function App() {
                       <button 
                         onClick={generateBrief} 
                         disabled={!selectedRing} 
-                        className={\`flex-1 text-[10px] font-bold py-2 rounded uppercase tracking-widest transition \${selectedRing ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_15px_rgba(217,119,6,0.4)]' : 'bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed'}\`}
+                        className={`flex-1 text-[10px] font-bold py-2 rounded uppercase tracking-widest transition ${selectedRing ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_15px_rgba(217,119,6,0.4)]' : 'bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed'}`}
                       >
                           Generate MHA Brief
                       </button>

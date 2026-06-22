@@ -6,6 +6,7 @@ import org.springframework.data.neo4j.repository.query.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.fraudshield.dto.SharedMuleLink;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,10 +52,12 @@ public interface MuleAccountRepository extends Neo4jRepository<MuleAccount, Stri
      */
     @Query("""
             MATCH (r:FraudRing)-[:OPERATES_THROUGH]->(m:MuleAccount)
-            WITH m, count(r) AS ringCount
+            WITH m, collect(r.ringId) AS rings, count(r) AS ringCount
             WHERE ringCount > 1
-            RETURN m
+            RETURN m.accountNumber AS sharedAccount, 
+                   rings[0] AS ring1, 
+                   rings[1] AS ring2
             ORDER BY ringCount DESC
             """)
-    List<MuleAccount> findSharedAcrossRings();
+    List<SharedMuleLink> findSharedAcrossRings();
 }
