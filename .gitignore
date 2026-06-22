@@ -1,0 +1,35 @@
+# ============================================================
+#  FraudShield AI – .gitignore
+#  NEVER commit secrets or compiled artifacts to GitHub.
+# ============================================================
+
+# ── Java / Maven build outputs ───────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# ── IDE files ────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# ── SECRETS (critical — these must never go to GitHub) ───────
+backend/src/main/resources/application.properties
+frontend/.env
+frontend/.env.local
+*.key
+*.pem
+
+# ── OS artifacts ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Node / Frontend ──────────────────────────────────────────
+node_modules/
+dist/
+.next/
+
+design/

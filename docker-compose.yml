@@ -1,0 +1,51 @@
+version: "3.8"
+
+# ============================================================
+#  FraudShield AI – Local Development Services
+#  Run: docker-compose up -d
+# ============================================================
+
+services:
+
+  # ── Neo4j Graph Database ──────────────────────────────────
+  sentinel-neo4j:
+    image: neo4j:latest
+    container_name: sentinel-neo4j
+    ports:
+      - "7474:7474"   # Neo4j Browser UI
+      - "7687:7687"   # Bolt protocol (Spring Data Neo4j)
+    environment:
+      NEO4J_AUTH: neo4j/sentinelpassword
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── PostgreSQL (local dev — use Neon in production) ───────
+  fraudshield-postgres:
+    image: postgres:16-alpine
+    container_name: fraudshield-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: fraudshield
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  postgres_data:
