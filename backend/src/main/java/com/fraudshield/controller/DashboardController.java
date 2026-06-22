@@ -54,7 +54,8 @@ public class DashboardController {
      */
     @GetMapping("/rings")
     public ResponseEntity<List<FraudRing>> getAllRings() {
-        return ResponseEntity.ok(fraudRingRepository.findAllWithMuleAccounts());
+        List<FraudRing> activeRings = fraudRingRepository.findAll().stream().toList();
+        return ResponseEntity.ok(activeRings);
     }
 
     /**

@@ -55,7 +55,7 @@ public class ThreatController {
     public ResponseEntity<List<ThreatScoreBreakdown>> getHotspots() {
         log.info("Hotspots endpoint called — dynamic rescore for all rings");
         List<ThreatScoreBreakdown> hotspots = fraudRingRepository
-                .findAllWithMuleAccounts()
+                .findAll()
                 .stream()
                 .map(ring -> threatEngine.score(ring, ring.getThreatScore()))
                 .sorted(Comparator.comparingDouble(ThreatScoreBreakdown::getThreatScore).reversed())
@@ -74,7 +74,7 @@ public class ThreatController {
     @GetMapping("/hotspots/map")
     public ResponseEntity<List<Map<String, Object>>> getHotspotsMapPins() {
         List<Map<String, Object>> pins = fraudRingRepository
-                .findAllWithMuleAccounts()
+                .findAll()
                 .stream()
                 .map(ring -> {
                     ThreatScoreBreakdown b = threatEngine.score(ring, ring.getThreatScore());
@@ -140,7 +140,7 @@ public class ThreatController {
     @GetMapping("/leaderboard")
     public ResponseEntity<List<ThreatScoreBreakdown>> getLeaderboard() {
         List<ThreatScoreBreakdown> ranked = fraudRingRepository
-                .findAllWithMuleAccounts()
+                .findAll()
                 .stream()
                 .map(ring -> threatEngine.score(ring, ring.getThreatScore()))
                 .sorted((a, b) -> Double.compare(b.getThreatScore(), a.getThreatScore()))

@@ -33,7 +33,7 @@ public class NetworkGraphController {
     @GetMapping("/network")
     public ResponseEntity<GraphDataResponse> getNetworkGraph() {
         log.info("Generating network graph data for visualization");
-        List<FraudRing> rings = fraudRingRepository.findAllWithMuleAccounts();
+        List<FraudRing> rings = fraudRingRepository.findAll();
 
         List<GraphDataResponse.NodeData> nodes = new ArrayList<>();
         List<GraphDataResponse.LinkData> links = new ArrayList<>();

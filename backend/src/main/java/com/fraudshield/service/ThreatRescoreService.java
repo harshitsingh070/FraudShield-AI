@@ -43,7 +43,7 @@ public class ThreatRescoreService {
      * @return list of {@link ThreatScoreBreakdown} sorted by threat score descending
      */
     public List<ThreatScoreBreakdown> rescoreAll() {
-        List<FraudRing> rings = fraudRingRepository.findAllWithMuleAccounts();
+        List<FraudRing> rings = fraudRingRepository.findAll();
 
         log.info("━━━ Threat re-score started — {} rings ━━━", rings.size());
 

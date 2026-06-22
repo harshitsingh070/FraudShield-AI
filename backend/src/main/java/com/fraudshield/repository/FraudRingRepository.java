@@ -31,17 +31,7 @@ public interface FraudRingRepository extends Neo4jRepository<FraudRing, String> 
     /** All rings of a specific fraud type (e.g., DIGITAL_ARREST, INVESTMENT_FRAUD). */
     List<FraudRing> findByFraudType(String fraudType);
 
-    /**
-     * Returns all rings with their mule accounts — formatted for the geospatial
-     * map component (lat, lon, threatScore, locationName, status).
-     */
-    @Query("""
-            MATCH (r:FraudRing)
-            OPTIONAL MATCH (r)-[:OPERATES_THROUGH]->(m:MuleAccount)
-            RETURN r, collect(m) as muleAccounts
-            ORDER BY r.threatScore DESC
-            """)
-    List<FraudRing> findAllWithMuleAccounts();
+    // findAllWithMuleAccounts removed in favor of standard findAll()
 
     /**
      * Counts all ACTIVE rings — used by the "Fraud Rings Detected" dashboard card.

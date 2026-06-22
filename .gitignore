@@ -18,6 +18,7 @@ target/
 
 # ── SECRETS (critical — these must never go to GitHub) ───────
 backend/src/main/resources/application.properties
+.env
 frontend/.env
 frontend/.env.local
 *.key
