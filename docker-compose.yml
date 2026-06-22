@@ -45,6 +45,38 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Backend (Spring Boot) ─────────────────────────────────
+  fraudshield-backend:
+    build: ./backend
+    container_name: fraudshield-backend
+    ports:
+      - "8080:8080"
+    environment:
+      # Override properties to point to the containers instead of localhost
+      SPRING_NEO4J_URI: bolt://sentinel-neo4j:7687
+      SPRING_DATASOURCE_URL: jdbc:postgresql://fraudshield-postgres:5432/fraudshield
+      # Pass through API key from host environment, or fallback to placeholder
+      GOOGLE_AI_STUDIO_API_KEY: ${GOOGLE_AI_STUDIO_API_KEY:-AQ.Ab8RN6LL8NZQD0-9GOzwAceZ4dnZ-SEJjg3T2DpNCWVmPNuvqA}
+    depends_on:
+      sentinel-neo4j:
+        condition: service_healthy
+      fraudshield-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Frontend (Vite + React) ───────────────────────────────
+  fraudshield-frontend:
+    build: ./frontend
+    container_name: fraudshield-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # Optional: Vite port and backend proxy config if needed
+      VITE_PORT: 5173
+    depends_on:
+      - fraudshield-backend
+    restart: unless-stopped
+
 volumes:
   neo4j_data:
   neo4j_logs:

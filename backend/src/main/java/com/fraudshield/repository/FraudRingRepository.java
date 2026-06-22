@@ -55,6 +55,12 @@ public interface FraudRingRepository extends Neo4jRepository<FraudRing, String> 
     @Query("MATCH (r:FraudRing) RETURN coalesce(sum(r.totalMoneyLaundered), 0)")
     double sumTotalMoneyLaundered();
 
+    interface CrossRingLink {
+        String getRing1();
+        String getRing2();
+        String getSharedAccount();
+    }
+
     /**
      * Detects shared mule accounts across rings — a graph-only insight impossible
      * in relational databases. Returns pairs of ring IDs sharing an account.
@@ -64,7 +70,7 @@ public interface FraudRingRepository extends Neo4jRepository<FraudRing, String> 
             WHERE r1.ringId < r2.ringId
             RETURN r1.ringId AS ring1, r2.ringId AS ring2, m.accountNumber AS sharedAccount
             """)
-    List<org.springframework.data.neo4j.core.schema.MapValue> findSharedMuleAccounts();
+    List<CrossRingLink> findSharedMuleAccounts();
 
     /**
      * Top N rings by total victim count — for dashboard victim impact summary.

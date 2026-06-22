@@ -1,5 +1,6 @@
 package com.fraudshield.controller;
 
+import com.fraudshield.domain.FraudRing;
 import com.fraudshield.dto.ThreatScoreBreakdown;
 import com.fraudshield.repository.FraudRingRepository;
 import com.fraudshield.service.ThreatEngineService;
@@ -9,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +29,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/threat")
+@CrossOrigin(origins = "*")   // permits map dashboard, investigation workbench, and citizen UI
 @RequiredArgsConstructor
 @Slf4j
 public class ThreatController {
@@ -34,6 +37,65 @@ public class ThreatController {
     private final ThreatRescoreService rescoreService;
     private final ThreatEngineService  threatEngine;
     private final FraudRingRepository  fraudRingRepository;
+
+    // ── Map Dashboard ─────────────────────────────────────────────────────────
+
+    /**
+     * Returns ALL rings with <em>dynamically recomputed</em> threat scores,
+     * sorted CRITICAL → LOW. Consumed by the geospatial map and the investigation
+     * workbench's ring selector.
+     *
+     * <p>Unlike {@code /leaderboard} (which reads persisted scores), this endpoint
+     * recomputes every ring's score on the fly before returning — ensuring the map
+     * always reflects the freshest view of graph intelligence.
+     *
+     * <p>Called by: map dashboard on initial load + every 60-second polling cycle.
+     */
+    @GetMapping("/hotspots")
+    public ResponseEntity<List<ThreatScoreBreakdown>> getHotspots() {
+        log.info("Hotspots endpoint called — dynamic rescore for all rings");
+        List<ThreatScoreBreakdown> hotspots = fraudRingRepository
+                .findAllWithMuleAccounts()
+                .stream()
+                .map(ring -> threatEngine.score(ring, ring.getThreatScore()))
+                .sorted(Comparator.comparingDouble(ThreatScoreBreakdown::getThreatScore).reversed())
+                .toList();
+        log.info("Returning {} hotspots", hotspots.size());
+        return ResponseEntity.ok(hotspots);
+    }
+
+    /**
+     * Lightweight variant of {@code /hotspots} — returns only the fields needed
+     * to render map pins (ring_id, location_name, lat, lon, threat_score, risk_level,
+     * fraud_type). Avoids sending the full breakdown payload for 100+ pins.
+     *
+     * <p>Called by: Leaflet / MapLibre pin renderer on every re-render.
+     */
+    @GetMapping("/hotspots/map")
+    public ResponseEntity<List<Map<String, Object>>> getHotspotsMapPins() {
+        List<Map<String, Object>> pins = fraudRingRepository
+                .findAllWithMuleAccounts()
+                .stream()
+                .map(ring -> {
+                    ThreatScoreBreakdown b = threatEngine.score(ring, ring.getThreatScore());
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("ring_id", ring.getRingId());
+                    map.put("location_name", ring.getLocationName());
+                    map.put("lat", ring.getLatitude());
+                    map.put("lon", ring.getLongitude());
+                    map.put("threat_score", b.getThreatScore());
+                    map.put("risk_level", b.getRiskLevel());
+                    map.put("fraud_type", ring.getFraudType() != null ? ring.getFraudType() : "UNKNOWN");
+                    map.put("status", ring.getStatus() != null ? ring.getStatus() : "UNKNOWN");
+                    return map;
+                })
+                .sorted((m1, m2) -> Double.compare(
+                        (Double) m2.get("threat_score"),
+                        (Double) m1.get("threat_score")
+                ))
+                .toList();
+        return ResponseEntity.ok(pins);
+    }
 
     /**
      * Triggers a full re-score of every ring and persists the new scores to Neo4j.

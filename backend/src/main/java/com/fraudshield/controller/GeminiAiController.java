@@ -30,6 +30,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/gemini")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 public class GeminiAiController {

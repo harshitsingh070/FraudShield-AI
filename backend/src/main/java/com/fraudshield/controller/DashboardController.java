@@ -29,6 +29,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/dashboard")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 public class DashboardController {

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/v1/fraud-shield")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 public class FraudShieldController {
