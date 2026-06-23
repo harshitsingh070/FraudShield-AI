@@ -15,7 +15,7 @@ import java.util.Optional;
  * <p>Custom Cypher queries power the fraud ring analysis endpoints.
  */
 @Repository
-public interface PhoneNumberRepository extends Neo4jRepository<PhoneNumber, Long> {
+public interface PhoneNumberRepository extends Neo4jRepository<PhoneNumber, String> {
 
     Optional<PhoneNumber> findByNumber(String number);
 

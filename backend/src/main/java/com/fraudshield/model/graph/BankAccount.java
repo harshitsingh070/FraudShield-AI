@@ -21,8 +21,8 @@ import org.springframework.data.neo4j.core.schema.Property;
 public class BankAccount {
 
     @Id
-    @GeneratedValue
-    private Long id;
+    @GeneratedValue(generatorClass = GeneratedValue.UUIDGenerator.class)
+    private String elementId;
 
     /** SHA-256 hash of the actual account number (never store raw). */
     @Property("account_hash")

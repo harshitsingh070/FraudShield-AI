@@ -41,9 +41,9 @@ public class DashboardService {
 
         // ── Metric cards ────────────────────────────────────────────────────
         long complaintsToday  = getComplaintsToday();
-        long highRiskNumbers  = phoneNumberRepository.countHighRiskNumbers();
-        long activeFraudRings = fraudRingRepository.countActiveRings();
-        double rawImpact      = fraudRingRepository.sumTotalMoneyLaundered();
+        long highRiskNumbers  = getSafeCount(() -> phoneNumberRepository.countHighRiskNumbers(), "high-risk numbers");
+        long activeFraudRings = getSafeCount(() -> fraudRingRepository.countActiveRings(), "active rings");
+        double rawImpact      = getSafeDouble(() -> fraudRingRepository.sumTotalMoneyLaundered(), "money laundered");
         String formattedImpact = formatInr(rawImpact);
 
         // ── Top threat leaderboard ──────────────────────────────────────────
@@ -81,6 +81,24 @@ public class DashboardService {
         } catch (Exception ex) {
             log.warn("Could not count today's complaints: {}", ex.getMessage());
             return 0;
+        }
+    }
+
+    private long getSafeCount(java.util.function.Supplier<Long> supplier, String label) {
+        try {
+            return supplier.get();
+        } catch (Exception ex) {
+            log.warn("Could not count {}: {}", label, ex.getMessage());
+            return 0;
+        }
+    }
+
+    private double getSafeDouble(java.util.function.Supplier<Double> supplier, String label) {
+        try {
+            return supplier.get();
+        } catch (Exception ex) {
+            log.warn("Could not sum {}: {}", label, ex.getMessage());
+            return 0.0;
         }
     }
 

@@ -29,7 +29,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/dashboard")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 public class DashboardController {
@@ -75,10 +74,15 @@ public class DashboardController {
     @GetMapping("/rings/top-threat")
     public ResponseEntity<List<FraudRing>> getTopThreatRings(
             @RequestParam(defaultValue = "5") int limit) {
-        List<FraudRing> rings = fraudRingRepository
-                .findByStatusOrderByThreatScoreDesc("ACTIVE")
-                .stream().limit(limit).toList();
-        return ResponseEntity.ok(rings);
+        try {
+            List<FraudRing> rings = fraudRingRepository
+                    .findByStatusOrderByThreatScoreDesc("ACTIVE")
+                    .stream().limit(limit).toList();
+            return ResponseEntity.ok(rings);
+        } catch (Exception ex) {
+            log.warn("top-threat query failed, returning empty: {}", ex.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     /**

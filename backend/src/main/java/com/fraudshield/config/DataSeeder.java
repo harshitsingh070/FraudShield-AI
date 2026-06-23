@@ -2,6 +2,8 @@ package com.fraudshield.config;
 
 import com.fraudshield.domain.FraudRing;
 import com.fraudshield.domain.MuleAccount;
+import com.fraudshield.model.jpa.Complaint;
+import com.fraudshield.repository.ComplaintRepository;
 import com.fraudshield.repository.FraudRingRepository;
 import com.fraudshield.service.ThreatRescoreService;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +11,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -44,6 +49,7 @@ public class DataSeeder {
 
     @Bean
     CommandLineRunner initDatabase(FraudRingRepository repository,
+                                   ComplaintRepository complaintRepository,
                                    ThreatRescoreService rescoreService) {
         return args -> {
 
@@ -202,6 +208,55 @@ public class DataSeeder {
             rescored.forEach(b -> log.info("  {} → score={} level={}",
                     b.getRingId(), b.getThreatScore(), b.getRiskLevel()));
             log.info("━━━ Engine complete — dashboard ready ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+            // ── Phase 4: Seed 147 realistic complaints into PostgreSQL ────────────
+            complaintRepository.deleteAll();
+            log.info("━━━ Seeding 147 complaint records ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            List<Complaint> complaints = new ArrayList<>();
+
+            String[][] seed = {
+                {"DIGITAL_ARREST","92.1","+919876543210","Delhi","Sir I am calling from CBI. Your Aadhaar is linked to money laundering. You must appear on video call immediately or we will arrest you."},
+                {"DIGITAL_ARREST","95.3","+917654321098","Mumbai","This is ED officer speaking. Your account is frozen. Pay ₹50000 bail immediately to avoid arrest."},
+                {"INVESTMENT_FRAUD","89.4","+918765432109","Pune","Join our exclusive Telegram trading group. 40% returns guaranteed. Minimum investment ₹25000."},
+                {"LOTTERY_FRAUD","91.7","+916543210987","Jaipur","Congratulations! You have won KBC lottery of ₹25 Lakh. Pay ₹2000 processing fee to claim prize."},
+                {"JOB_FRAUD","87.2","+915432109876","Bengaluru","Infosys remote job offer. Salary 8 LPA. Pay ₹5000 registration fee to confirm your onboarding slot."},
+                {"DIGITAL_ARREST","93.8","+914321098765","Noida","TRAI notice: Your mobile will be disconnected in 2 hours for illegal activity. Call this number immediately."},
+                {"INVESTMENT_FRAUD","88.5","+913210987654","Hyderabad","Make ₹50000 daily from home. WhatsApp trading group. No experience needed. Limited seats."},
+                {"DIGITAL_ARREST","96.1","+912109876543","Delhi","Your Aadhaar has been misused for 17 bank accounts. Supreme Court summons issued. Respond within 2 hours."},
+                {"LOTTERY_FRAUD","90.3","+911098765432","Chennai","Amazon customer reward: You have been selected for ₹15 Lakh gift. Click link and enter OTP to claim."},
+                {"JOB_FRAUD","85.9","+919988776655","Kolkata","Work from home data entry job. Earn ₹15000 weekly. Pay ₹3000 security deposit to get started."},
+                {"DIGITAL_ARREST","94.2","+918877665544","Gurugram","This is Mumbai Crime Branch. You are accused in drug trafficking case. Do not tell anyone or you will be arrested immediately."},
+                {"INVESTMENT_FRAUD","91.0","+917766554433","Ahmedabad","Crypto arbitrage bot guaranteed 3% daily returns. Invest ₹1 Lakh and earn ₹3000 every day automatically."},
+                {"DIGITAL_ARREST","92.7","+916655443322","Lucknow","Income Tax department notice. Undeclared income of ₹8.5 Lakh found. Pay penalty now to avoid FIR."},
+                {"LOTTERY_FRAUD","88.1","+915544332211","Patna","You are the lucky winner of Jio 5G lottery. Claim your Samsung S24 by paying ₹1500 courier charges."},
+                {"JOB_FRAUD","86.4","+914433221100","Chandigarh","TCS lateral hiring. 12 LPA package. Pay ₹8000 background verification fee to process your application."},
+            };
+
+            LocalDateTime base = LocalDateTime.now().minusDays(30);
+            String[] channels = {"WHATSAPP", "SMS", "VOICE_TRANSCRIPT", "TEXT"};
+            int complaintNum = 0;
+            for (int day = 0; day < 30; day++) {
+                int dailyCount = (day < 7) ? 3 : (day < 20) ? 5 : 7; // ramp up over 30 days
+                for (int j = 0; j < dailyCount && complaintNum < 147; j++) {
+                    String[] row = seed[complaintNum % seed.length];
+                    Complaint c = Complaint.builder()
+                            .description(row[4])
+                            .scamType(row[0])
+                            .confidence(Double.parseDouble(row[1]))
+                            .phoneNumber(row[2])
+                            .victimCity(row[3])
+                            .sourceChannel(channels[complaintNum % channels.length])
+                            .triggerPhrases("[\"arrest\",\"CBI\",\"OTP\",\"lottery\",\"fee\"]")
+                            .recommendedActions("[\"Block sender\",\"Report to cybercrime.gov.in\",\"Do not pay\"]") 
+                            .createdAt(base.plusDays(day).plusHours(complaintNum % 12).plusMinutes(complaintNum * 7 % 59))
+                            .build();
+                    complaints.add(c);
+                    complaintNum++;
+                }
+            }
+            complaintRepository.saveAll(complaints);
+            log.info("  ✅ {} complaint records seeded into PostgreSQL", complaints.size());
+            log.info("━━━ All systems ready ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         };
     }
 

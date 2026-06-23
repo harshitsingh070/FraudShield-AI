@@ -1,8 +1,9 @@
 version: "3.8"
 
 # ============================================================
-#  FraudShield AI – Local Development Services
-#  Run: docker-compose up -d
+#  FraudShield AI – Full Stack
+#  Single command: docker-compose up --build
+#  All services start in the correct order via healthchecks.
 # ============================================================
 
 services:
@@ -12,8 +13,8 @@ services:
     image: neo4j:latest
     container_name: sentinel-neo4j
     ports:
-      - "7474:7474"   # Neo4j Browser UI
-      - "7687:7687"   # Bolt protocol (Spring Data Neo4j)
+      - "7474:7474"   # Neo4j Browser UI  → http://localhost:7474
+      - "7687:7687"   # Bolt protocol     ← Spring Data Neo4j connects here
     environment:
       NEO4J_AUTH: neo4j/sentinelpassword
     volumes:
@@ -21,12 +22,22 @@ services:
       - neo4j_logs:/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "neo4j", "status"]
-      interval: 30s
+      # cypher-shell is always present in the neo4j image and is the
+      # most reliable way to confirm the database is accepting queries.
+      test:
+        - "CMD"
+        - "cypher-shell"
+        - "-u" 
+        - "neo4j"
+        - "-p"
+        - "sentinelpassword"
+        - "RETURN 1"
+      interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
-  # ── PostgreSQL (local dev — use Neon in production) ───────
+  # ── PostgreSQL ────────────────────────────────────────────
   fraudshield-postgres:
     image: postgres:16-alpine
     container_name: fraudshield-postgres
@@ -40,41 +51,58 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fraudshield"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
-  # ── Backend (Spring Boot) ─────────────────────────────────
+  # ── Spring Boot Backend ───────────────────────────────────
   fraudshield-backend:
     build: ./backend
     container_name: fraudshield-backend
     ports:
       - "8080:8080"
     environment:
-      # Override properties to point to the containers instead of localhost
+      # Point to sibling containers by Docker service name
       SPRING_NEO4J_URI: bolt://sentinel-neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: sentinelpassword
       SPRING_DATASOURCE_URL: jdbc:postgresql://fraudshield-postgres:5432/fraudshield
-      # Pass through API key from host environment, or fallback to placeholder
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      # Suppress the open-in-view warning
+      SPRING_JPA_OPEN_IN_VIEW: "false"
+      # Gemini API key — set in .env or export before running
       GOOGLE_AI_STUDIO_API_KEY: ${GOOGLE_AI_STUDIO_API_KEY:-YOUR_GEMINI_API_KEY_HERE}
     depends_on:
       sentinel-neo4j:
         condition: service_healthy
       fraudshield-postgres:
         condition: service_healthy
+    healthcheck:
+      # Actuator /health endpoint confirms Spring Boot is fully started
+      # and all DB connections are live. curl is installed in the Dockerfile.
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
     restart: unless-stopped
 
-  # ── Frontend (Vite + React) ───────────────────────────────
+  # ── Vite + React Frontend ─────────────────────────────────
   fraudshield-frontend:
     build: ./frontend
     container_name: fraudshield-frontend
     ports:
       - "5173:5173"
     environment:
-      # Optional: Vite port and backend proxy config if needed
-      VITE_PORT: 5173
+      # Vite reads this at dev-server startup (not build time) to configure
+      # the /api proxy target. Uses Docker service name for container networking.
+      VITE_API_TARGET: http://fraudshield-backend:8080
     depends_on:
-      - fraudshield-backend
+      fraudshield-backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

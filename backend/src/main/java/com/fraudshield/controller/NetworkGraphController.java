@@ -23,7 +23,6 @@ import java.util.Set;
  */
 @RestController
 @RequestMapping("/api/v1/graph")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 public class NetworkGraphController {

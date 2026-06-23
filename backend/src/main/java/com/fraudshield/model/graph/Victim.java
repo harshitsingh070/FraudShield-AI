@@ -29,8 +29,8 @@ import java.util.Set;
 public class Victim {
 
     @Id
-    @GeneratedValue
-    private Long id;
+    @GeneratedValue(generatorClass = GeneratedValue.UUIDGenerator.class)
+    private String elementId;
 
     /** Anonymised victim identifier (e.g. UUID or case number). */
     @Property("victim_id")

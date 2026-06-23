@@ -30,8 +30,8 @@ import java.util.Set;
 public class PhoneNumber {
 
     @Id
-    @GeneratedValue
-    private Long id;
+    @GeneratedValue(generatorClass = GeneratedValue.UUIDGenerator.class)
+    private String elementId;
 
     /** The actual phone number string (E.164 or local format). */
     @Property("number")

@@ -20,7 +20,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/investigation")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 public class InvestigationController {

@@ -64,8 +64,8 @@ public class ThreatRescoreService {
             // Auto-escalate status based on score (DORMANT rings that spike → ACTIVE)
             if (breakdown.getThreatScore() >= 6.0 && "DORMANT".equals(ring.getStatus())) {
                 ring.setStatus("ACTIVE");
-                log.warn("⚠ Ring {} auto-escalated DORMANT → ACTIVE (score={:.2f})",
-                        ring.getRingId(), breakdown.getThreatScore());
+                log.warn("⚠ Ring {} auto-escalated DORMANT → ACTIVE (score={})",
+                        ring.getRingId(), String.format("%.2f", breakdown.getThreatScore()));
             }
 
             fraudRingRepository.save(ring);
@@ -75,10 +75,10 @@ public class ThreatRescoreService {
             Double delta = breakdown.getScoreDelta();
             if (delta != null && delta > 1.0) escalated++;
 
-            log.info("  {} {} → {:.2f} ({})  Δ={}",
+            log.info("  {} {} → {} ({})  Δ={}",
                     ring.getRingId(),
                     ring.getLocationName(),
-                    breakdown.getThreatScore(),
+                    String.format("%.2f", breakdown.getThreatScore()),
                     breakdown.getRiskLevel(),
                     delta != null ? String.format("%+.2f", delta) : "n/a");
         }
@@ -104,7 +104,7 @@ public class ThreatRescoreService {
             ThreatScoreBreakdown breakdown = threatEngine.score(ring, previous);
             ring.setThreatScore(breakdown.getThreatScore());
             fraudRingRepository.save(ring);
-            log.info("Rescored {} → {:.2f}", ringId, breakdown.getThreatScore());
+            log.info("Rescored {} → {}", ringId, String.format("%.2f", breakdown.getThreatScore()));
             return breakdown;
         }).orElse(null);
     }

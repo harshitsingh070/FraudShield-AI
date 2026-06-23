@@ -29,7 +29,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/threat")
-@CrossOrigin(origins = "*")   // permits map dashboard, investigation workbench, and citizen UI
 @RequiredArgsConstructor
 @Slf4j
 public class ThreatController {
