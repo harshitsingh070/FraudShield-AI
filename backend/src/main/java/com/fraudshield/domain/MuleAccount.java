@@ -45,4 +45,13 @@ public class MuleAccount {
 
     /** Date when this account was first observed in a fraud chain (ISO-8601) */
     private String flaggedDate;
+
+    /** Status of data verification: PENDING, VERIFIED_REAL, REJECTED_FAKE */
+    private String verificationStatus = "PENDING";
+
+    /** Confidence score of the AI verification (0.0 to 100.0) */
+    private double verificationConfidence;
+
+    /** Tracks who verified the data: AI or manual investigator name */
+    private String verifiedBy;
 }

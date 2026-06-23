@@ -35,7 +35,7 @@ public interface PhoneNumberRepository extends Neo4jRepository<PhoneNumber, Stri
 
     /** Count all PhoneNumber nodes with risk_level = HIGH or CRITICAL. */
     @Query("MATCH (p:PhoneNumber) WHERE p.risk_level IN ['HIGH', 'CRITICAL'] RETURN count(p)")
-    long countHighRiskNumbers();
+    Long countHighRiskNumbers();
 
     /** Return top N most complained-about numbers for the dashboard alert table. */
     @Query("""

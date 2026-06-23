@@ -140,7 +140,7 @@ public class GeminiAiController {
                 "gemini_reachable", apiReachable,
                 "fallback_mode", probe.isFallback(),
                 "component",     "gemini-ai-service",
-                "model",         "gemini-2.0-flash"
+                "model",         "gemini-2.5-flash"
         ));
     }
 }

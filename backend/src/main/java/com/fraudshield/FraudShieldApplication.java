@@ -14,7 +14,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *   <li>Executive Dashboard API endpoints</li>
  * </ul>
  */
+import org.springframework.scheduling.annotation.EnableScheduling;
+
 @SpringBootApplication
+@EnableScheduling
 public class FraudShieldApplication {
 
     public static void main(String[] args) {

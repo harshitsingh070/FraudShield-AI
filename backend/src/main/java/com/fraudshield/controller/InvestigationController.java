@@ -72,4 +72,21 @@ public class InvestigationController {
         log.info("Fetching cross-ring pairs");
         return ResponseEntity.ok(fraudRingRepository.findSharedMuleAccounts());
     }
+
+    /**
+     * Human-in-the-loop endpoint to manually verify or reject a FraudRing.
+     * This feeds into the gold-standard dataset.
+     */
+    @PostMapping("/ring/{ringId}/verify")
+    public ResponseEntity<?> verifyFraudRing(@PathVariable String ringId, 
+                                             @RequestParam String status, 
+                                             @RequestParam(defaultValue = "Human Investigator") String investigatorName) {
+        log.info("Manual verification for FraudRing: {} -> {} by {}", ringId, status, investigatorName);
+        return fraudRingRepository.findById(ringId).map(ring -> {
+            ring.setVerificationStatus(status);
+            ring.setVerifiedBy(investigatorName);
+            fraudRingRepository.save(ring);
+            return ResponseEntity.ok(ring);
+        }).orElse(ResponseEntity.notFound().build());
+    }
 }

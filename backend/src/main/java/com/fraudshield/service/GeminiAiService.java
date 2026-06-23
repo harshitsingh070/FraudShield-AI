@@ -23,7 +23,7 @@ import java.util.Map;
  * <h2>Gemini AI Service — Phase 4 (Structured Inference)</h2>
  *
  * <p>Sends three categories of structured inference payloads directly to
- * <strong>Gemini 2.0 Flash</strong> using Spring's {@link RestClient} (sync HTTP,
+ * <strong>Gemini 2.5 Flash</strong> using Spring's {@link RestClient} (sync HTTP,
  * no reactive overhead). No Python sidecars, no external libraries.
  *
  * <h3>Three inference modes</h3>
@@ -406,7 +406,7 @@ public class GeminiAiService {
     // =========================================================================
 
     /**
-     * Sends a prompt to Gemini 2.0 Flash and returns the raw JSON response string.
+     * Sends a prompt to Gemini 2.5 Flash and returns the raw JSON response string.
      *
      * <p>Uses {@link RestClient} — the Spring 6 synchronous HTTP client.
      * One retry is attempted on any exception before giving up.

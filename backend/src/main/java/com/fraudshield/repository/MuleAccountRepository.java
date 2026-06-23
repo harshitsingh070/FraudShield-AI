@@ -44,7 +44,7 @@ public interface MuleAccountRepository extends Neo4jRepository<MuleAccount, Stri
      * Sum of all confirmed mule account money flows — total financial intelligence figure.
      */
     @Query("MATCH (m:MuleAccount {confirmed: true}) RETURN coalesce(sum(m.totalMoneyFlow), 0)")
-    double sumConfirmedMoneyFlow();
+    Double sumConfirmedMoneyFlow();
 
     /**
      * Accounts that appear in more than one FraudRing relationship — the most

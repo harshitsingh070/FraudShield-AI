@@ -96,13 +96,17 @@ export default function App() {
     setCopilotMode('thinking');
 
     // Try real API first
-    fetch('/api/v1/gemini/analyze', {
+    fetch('/api/v1/gemini/analyze-transcript', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msgInput, phoneNumber: phoneInput, channel: channelInput })
+      body: JSON.stringify({ transcript: `[Channel: ${channelInput}, Suspect Phone: ${phoneInput}]\n\n${msgInput}` })
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('HTTP error');
+        return r.json();
+      })
       .then(data => {
+        if (data.isFallback) throw new Error('API returned fallback mode');
         setAiResult(data);
         setCopilotMode('result');
       })
@@ -129,57 +133,109 @@ export default function App() {
   const generateBrief = (ring) => {
     const r = ring || selectedRing;
     if (!r) return;
-    const name = r.location_name || r.locationName || r.ring_id || r;
-    const score = (r.threat_score || r.threatScore || 8.5).toFixed(1);
-    const victims = r.total_victim_count || r.victimCount || 36;
-    const money = r.total_money_laundered
-      ? '₹' + (r.total_money_laundered / 10000000).toFixed(2) + ' Cr'
-      : '₹4.89 Cr';
-    const type = r.fraud_type || r.fraudType || 'DIGITAL_ARREST';
+    const ringId = r.ring_id || r.ringId;
+    const name = r.location_name || r.locationName || ringId || r;
 
-    setCopilotHtml(`
-      <div class="space-y-3 text-xs">
-        <div class="text-amber-400 font-bold border-b border-amber-900/50 pb-1 uppercase tracking-wider text-[10px]">
-          ⚡ MHA INTELLIGENCE BRIEF — ${name}
-        </div>
-        <div>
-          <span class="text-rose-400 font-bold uppercase text-[9px] tracking-wider block mb-1">THREAT CLASSIFICATION</span>
-          <span class="text-rose-300">${type.replace('_',' ')} — Threat Level: ${score}/10</span>
-        </div>
-        <div>
-          <span class="text-orange-400 font-bold uppercase text-[9px] tracking-wider block mb-1">IMPACT SUMMARY</span>
-          <span class="text-slate-300">${victims} victims confirmed · Estimated losses: ${money}</span>
-        </div>
-        <div>
-          <span class="text-amber-400 font-bold uppercase text-[9px] tracking-wider block mb-1">RECOMMENDED DIRECTIVES</span>
-          <ul class="list-disc pl-4 text-slate-300 space-y-0.5">
-            <li>Issue Section 91 CrPC notice to telecom providers</li>
-            <li>Freeze all OPERATES_THROUGH mule routing accounts</li>
-            <li>Deploy cyber cell unit to triangulated IP coordinate</li>
-            <li>Initiate 1930 NCC victim advisory broadcast</li>
-          </ul>
-        </div>
-        <div>
-          <span class="text-emerald-400 font-bold uppercase text-[9px] tracking-wider block mb-1">GRAPH INTELLIGENCE</span>
-          <span class="text-slate-300">Cross-ring coordination detected with RING-JH-01 via shared mule 970070080090</span>
-        </div>
-      </div>
-    `);
+    setCopilotHtml('<span class="text-amber-400 animate-pulse">⟳ Generating MHA Intelligence Brief via Gemini...</span>');
 
-    // Download as .txt
-    const briefText = `MINISTRY OF HOME AFFAIRS — CYBER INTELLIGENCE BRIEF\n` +
-      `Generated: ${new Date().toISOString()}\n` +
-      `Network: ${name}\nThreat Score: ${score}/10\nVictims: ${victims}\nEstimated Loss: ${money}\n` +
-      `Fraud Type: ${type}\n\nRECOMMENDED DIRECTIVES:\n` +
-      `1. Issue Section 91 CrPC notice to telecom providers\n` +
-      `2. Freeze all identified mule routing accounts\n` +
-      `3. Deploy cyber cell unit to triangulated IP coordinate\n` +
-      `4. Initiate 1930 NCC victim advisory broadcast\n`;
-    const blob = new Blob([briefText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `MHA_Brief_${(r.ring_id || 'RING').replace('-','_')}.txt`;
-    a.click(); URL.revokeObjectURL(url);
+    fetch(`/api/v1/gemini/ring-intelligence/${ringId}`)
+      .then(res => {
+         if (!res.ok) throw new Error('API Error');
+         return res.json();
+      })
+      .then(data => {
+         if (data.isFallback) throw new Error('Fallback mode');
+         const threatAssessment = data.threatAssessment || data.threat_assessment;
+         const intelligenceBrief = data.intelligenceBrief || data.intelligence_brief;
+         const probableHub = data.probableHub || data.probable_hub;
+         const primaryTactic = data.primaryTactic || data.primary_tactic;
+         const interventionSteps = data.interventionSteps || data.intervention_steps || [];
+         const interdictionWindow = data.estimatedInterdictionWindow || data.estimated_interdiction_window;
+
+         setCopilotHtml(`
+           <div class="space-y-3 text-xs">
+             <div class="text-amber-400 font-bold border-b border-amber-900/50 pb-1 uppercase tracking-wider text-[10px]">
+               ⚡ MHA INTELLIGENCE BRIEF — ${name}
+             </div>
+             <div>
+               <span class="text-rose-400 font-bold uppercase text-[9px] tracking-wider block mb-1">THREAT ASSESSMENT</span>
+               <span class="text-rose-300">${threatAssessment}</span>
+             </div>
+             <div>
+               <span class="text-orange-400 font-bold uppercase text-[9px] tracking-wider block mb-1">INTELLIGENCE BRIEF</span>
+               <span class="text-slate-300">${intelligenceBrief}</span>
+             </div>
+             <div>
+               <span class="text-amber-400 font-bold uppercase text-[9px] tracking-wider block mb-1">PROBABLE HUB & TACTIC</span>
+               <span class="text-slate-300">${probableHub} — ${primaryTactic}</span>
+             </div>
+             <div>
+               <span class="text-emerald-400 font-bold uppercase text-[9px] tracking-wider block mb-1">RECOMMENDED DIRECTIVES</span>
+               <ul class="list-disc pl-4 text-slate-300 space-y-0.5">
+                 ${interventionSteps.map(step => `<li>${step}</li>`).join('')}
+               </ul>
+             </div>
+           </div>
+         `);
+
+         const briefText = `MINISTRY OF HOME AFFAIRS — CYBER INTELLIGENCE BRIEF\nGenerated: ${new Date().toISOString()}\nNetwork: ${name}\nHub: ${probableHub}\nTactic: ${primaryTactic}\nWindow: ${interdictionWindow}\n\nTHREAT ASSESSMENT:\n${threatAssessment}\n\nINTELLIGENCE BRIEF:\n${intelligenceBrief}\n\nRECOMMENDED DIRECTIVES:\n${interventionSteps.map((s,i) => `${i+1}. ${s}`).join('\n')}`;
+         const blob = new Blob([briefText], { type: 'text/plain' });
+         const url = URL.createObjectURL(blob);
+         const a = document.createElement('a'); a.href = url;
+         a.download = `MHA_Brief_${ringId}.txt`;
+         a.click(); URL.revokeObjectURL(url);
+      })
+      .catch(() => {
+        const score = (r.threat_score || r.threatScore || 8.5).toFixed(1);
+        const victims = r.total_victim_count || r.victimCount || 36;
+        const money = r.total_money_laundered
+          ? '₹' + (r.total_money_laundered / 10000000).toFixed(2) + ' Cr'
+          : '₹4.89 Cr';
+        const type = r.fraud_type || r.fraudType || 'DIGITAL_ARREST';
+
+        setCopilotHtml(`
+          <div class="space-y-3 text-xs">
+            <div class="text-amber-400 font-bold border-b border-amber-900/50 pb-1 uppercase tracking-wider text-[10px]">
+              ⚡ MHA INTELLIGENCE BRIEF — ${name}
+            </div>
+            <div>
+              <span class="text-rose-400 font-bold uppercase text-[9px] tracking-wider block mb-1">THREAT CLASSIFICATION</span>
+              <span class="text-rose-300">${type.replace('_',' ')} — Threat Level: ${score}/10</span>
+            </div>
+            <div>
+              <span class="text-orange-400 font-bold uppercase text-[9px] tracking-wider block mb-1">IMPACT SUMMARY</span>
+              <span class="text-slate-300">${victims} victims confirmed · Estimated losses: ${money}</span>
+            </div>
+            <div>
+              <span class="text-amber-400 font-bold uppercase text-[9px] tracking-wider block mb-1">RECOMMENDED DIRECTIVES</span>
+              <ul class="list-disc pl-4 text-slate-300 space-y-0.5">
+                <li>Issue Section 91 CrPC notice to telecom providers</li>
+                <li>Freeze all OPERATES_THROUGH mule routing accounts</li>
+                <li>Deploy cyber cell unit to triangulated IP coordinate</li>
+                <li>Initiate 1930 NCC victim advisory broadcast</li>
+              </ul>
+            </div>
+            <div>
+              <span class="text-emerald-400 font-bold uppercase text-[9px] tracking-wider block mb-1">GRAPH INTELLIGENCE</span>
+              <span class="text-slate-300">Cross-ring coordination detected with RING-JH-01 via shared mule 970070080090</span>
+            </div>
+          </div>
+        `);
+
+        const briefText = `MINISTRY OF HOME AFFAIRS — CYBER INTELLIGENCE BRIEF\n` +
+          `Generated: ${new Date().toISOString()}\n` +
+          `Network: ${name}\nThreat Score: ${score}/10\nVictims: ${victims}\nEstimated Loss: ${money}\n` +
+          `Fraud Type: ${type}\n\nRECOMMENDED DIRECTIVES:\n` +
+          `1. Issue Section 91 CrPC notice to telecom providers\n` +
+          `2. Freeze all identified mule routing accounts\n` +
+          `3. Deploy cyber cell unit to triangulated IP coordinate\n` +
+          `4. Initiate 1930 NCC victim advisory broadcast\n`;
+        const blob = new Blob([briefText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = `MHA_Brief_${(r.ring_id || 'RING').replace('-','_')}.txt`;
+        a.click(); URL.revokeObjectURL(url);
+      });
   };
 
   const detectSharedMules = () => {
@@ -306,7 +362,7 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Classification</div>
-                  <div className="text-rose-300 font-bold text-sm">{(aiResult.scamType || 'UNKNOWN').replace(/_/g,' ')}</div>
+                  <div className="text-rose-300 font-bold text-sm">{(aiResult.scamType || aiResult.scam_type || 'UNKNOWN').replace(/_/g,' ')}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Confidence</div>
@@ -326,12 +382,17 @@ export default function App() {
               )}
               <div className="text-[9px] text-slate-500 uppercase tracking-wider">Trigger Phrases</div>
               <div className="flex flex-wrap gap-1">
-                {(aiResult.triggerPhrases || ['arrest','fee','OTP']).map((p,i) => (
+                {(aiResult.triggerPhrases || aiResult.trigger_phrases || ['arrest','fee','OTP']).map((p,i) => (
                   <span key={i} className="bg-rose-950/50 border border-rose-900/50 text-rose-300 text-[9px] px-2 py-0.5 rounded font-mono">{p}</span>
                 ))}
               </div>
               <button
-                onClick={() => aiResult.matchedRing && generateBrief({ ring_id: aiResult.matchedRing, location_name: aiResult.matchedCity, threat_score: 8.5, fraud_type: aiResult.scamType, total_victim_count: aiResult.victimCount, total_money_laundered: 48900000 })}
+                onClick={() => {
+                  const ringToUse = aiResult.matchedRing 
+                    ? { ring_id: aiResult.matchedRing, location_name: aiResult.matchedCity, threat_score: 8.5, fraud_type: (aiResult.scamType || aiResult.scam_type), total_victim_count: aiResult.victimCount, total_money_laundered: 48900000 } 
+                    : (selectedRing || queue?.[0]);
+                  if (ringToUse) generateBrief(ringToUse);
+                }}
                 className="bg-amber-700 hover:bg-amber-600 text-white text-[9px] font-bold py-2 rounded uppercase tracking-widest transition"
               >
                 Generate MHA Brief

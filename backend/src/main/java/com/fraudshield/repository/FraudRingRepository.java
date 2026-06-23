@@ -37,13 +37,13 @@ public interface FraudRingRepository extends Neo4jRepository<FraudRing, String> 
      * Counts all ACTIVE rings — used by the "Fraud Rings Detected" dashboard card.
      */
     @Query("MATCH (r:FraudRing {status: 'ACTIVE'}) RETURN count(r)")
-    long countActiveRings();
+    Long countActiveRings();
 
     /**
      * Sums total money laundered across ALL rings — for the "Financial Impact" card.
      */
     @Query("MATCH (r:FraudRing) RETURN coalesce(sum(r.totalMoneyLaundered), 0)")
-    double sumTotalMoneyLaundered();
+    Double sumTotalMoneyLaundered();
 
     interface CrossRingLink {
         String getRing1();

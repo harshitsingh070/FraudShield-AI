@@ -67,4 +67,13 @@ public class FraudRing {
      */
     @Relationship(type = "OPERATES_THROUGH", direction = Relationship.Direction.OUTGOING)
     private Set<MuleAccount> muleAccounts = new HashSet<>();
+
+    /** Status of data verification: PENDING, VERIFIED_REAL, REJECTED_FAKE */
+    private String verificationStatus = "PENDING";
+
+    /** Confidence score of the AI verification (0.0 to 100.0) */
+    private double verificationConfidence;
+
+    /** Tracks who verified the data: AI or manual investigator name */
+    private String verifiedBy;
 }
