@@ -38,7 +38,7 @@ public class GeminiService {
     private final WebClient geminiWebClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${google.ai.studio.api.key}")
+    @Value("${groq.api.key}")
     private String apiKey;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -116,52 +116,59 @@ public class GeminiService {
 
         String prompt = FRAUD_CLASSIFICATION_PROMPT.formatted(description);
 
-        // Build the Gemini API request body
+        // Build the Groq API request body (OpenAI-compatible)
         Map<String, Object> requestBody = Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(
-                                Map.of("text", prompt)
-                        ))
+                "model", "llama-3.3-70b-versatile",
+                "messages", List.of(
+                        Map.of("role", "user", "content", prompt)
                 ),
-                "generationConfig", Map.of(
-                        "temperature", 0.1,          // low temp for deterministic classification
-                        "maxOutputTokens", 1024,
-                        "responseMimeType", "application/json"
-                ),
-                "safetySettings", List.of(
-                        Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE")
-                )
+                "temperature", 0.1,
+                "response_format", Map.of("type", "json_object")
         );
 
-        try {
-            String rawResponse = geminiWebClient.post()
-                    .uri(uriBuilder -> uriBuilder
-                            .path(":generateContent")
-                            .queryParam("key", apiKey)
-                            .build())
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+        int maxAttempts = 4;
+        long delayMs = 1500;
+        
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                log.info("Gemini fraud classification — attempt {}/{}", attempt, maxAttempts);
+                
+                String rawResponse = geminiWebClient.post()
+                        .uri("https://api.groq.com/openai/v1/chat/completions")
+                        .header("Authorization", "Bearer " + apiKey)
+                        .bodyValue(requestBody)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
 
-            return parseGeminiResponse(rawResponse);
+                return parseGeminiResponse(rawResponse);
 
-        } catch (Exception ex) {
-            log.error("Gemini API call failed: {}", ex.getMessage(), ex);
-            // Return a safe fallback so the frontend never crashes
-            return FraudAnalysisResponse.builder()
-                    .scamType("UNKNOWN")
-                    .confidence(0.0)
-                    .riskLevel("LOW")
-                    .triggerPhrases(List.of())
-                    .recommendedActions(List.of(
-                            "Service temporarily unavailable. Please call 1930 for immediate assistance."))
-                    .explanation("Analysis service encountered an error. Manual review recommended.")
-                    .build();
+            } catch (Exception ex) {
+                log.warn("Gemini fraud classification — attempt {} failed: {}", attempt, ex.getMessage());
+                if (attempt == maxAttempts) {
+                    log.error("Gemini fraud classification failed after {} attempts.", maxAttempts, ex);
+                } else {
+                    try {
+                        log.info("Gemini fraud classification — backing off for {}ms...", delayMs);
+                        Thread.sleep(delayMs);
+                        delayMs *= 2; // 1500ms, 3000ms, 6000ms
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
         }
+
+        // Return a safe fallback so the frontend never crashes
+        return FraudAnalysisResponse.builder()
+                .scamType("UNKNOWN")
+                .confidence(0.0)
+                .riskLevel("LOW")
+                .triggerPhrases(List.of())
+                .recommendedActions(List.of(
+                        "Service temporarily unavailable. Please call 1930 for immediate assistance."))
+                .explanation("Analysis service is experiencing high demand. Please try again later.")
+                .build();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -175,14 +182,12 @@ public class GeminiService {
     private FraudAnalysisResponse parseGeminiResponse(String rawJson) throws Exception {
         JsonNode root = objectMapper.readTree(rawJson);
 
-        // Navigate Gemini response structure: candidates[0].content.parts[0].text
+        // Navigate Groq response structure: choices[0].message.content
         String contentText = root
-                .path("candidates")
+                .path("choices")
                 .get(0)
+                .path("message")
                 .path("content")
-                .path("parts")
-                .get(0)
-                .path("text")
                 .asText();
 
         log.debug("Gemini raw classification JSON: {}", contentText);

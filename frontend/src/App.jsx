@@ -83,9 +83,9 @@ function CurrencyScanner() {
       const res = await fetch('/api/currency/analyze', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      // Validate that the response contains meaningful data from Gemini
+      // Validate that the response contains meaningful data from SentinalAI
       if (!data.verdict || data.authenticityScore === undefined || data.authenticityScore === null) {
-        throw new Error('Gemini Vision returned an incomplete response. Please try again or check the API key.');
+        throw new Error('SentinalAI Vision returned an incomplete response. Please try again or check the API key.');
       }
       setResult(data);
     } catch (e) {
@@ -179,7 +179,7 @@ function CurrencyScanner() {
                       if (!apiRes.ok) throw new Error(`Server error ${apiRes.status}`);
                       const data = await apiRes.json();
                       if (!data.verdict || data.authenticityScore === undefined || data.authenticityScore === null) {
-                        throw new Error('Gemini Vision returned an incomplete response. Please try again or check the API key.');
+                        throw new Error('SentinalAI Vision returned an incomplete response. Please try again or check the API key.');
                       }
                       setResult(data);
                     } catch (e) {
@@ -219,7 +219,7 @@ function CurrencyScanner() {
                 ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/40'
                 : 'bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed'}`}
           >
-            {loading ? 'Analysing with Gemini Vision...' : 'Scan Currency Note'}
+            {loading ? 'Analysing with SentinalAI Vision...' : 'Scan Currency Note'}
           </button>
         </div>
 
@@ -245,7 +245,7 @@ function CurrencyScanner() {
         {loading && (
           <div className="bg-slate-900 border border-amber-900/40 rounded-xl p-8 flex flex-col items-center justify-center gap-4 shadow-xl" style={{ minHeight: '420px' }}>
             <div className="text-5xl animate-pulse">&#128269;</div>
-            <div className="text-amber-400 font-mono text-sm animate-pulse">Gemini Vision analysing currency note...</div>
+            <div className="text-amber-400 font-mono text-sm animate-pulse">SentinalAI Vision analysing currency note...</div>
             <div className="text-[10px] text-slate-500 font-mono">Checking security thread · watermark · microprint · colour shift strip</div>
           </div>
         )}
@@ -255,7 +255,7 @@ function CurrencyScanner() {
             <div className="text-6xl opacity-20">&#8377;</div>
             <div className="text-slate-600 font-mono text-xs text-center">
               Upload a currency note image to begin analysis.<br />
-              <span className="text-slate-700">Powered by Gemini Vision AI · RBI authentication standards</span>
+              <span className="text-slate-700">Powered by SentinalAI Vision AI · RBI authentication standards</span>
             </div>
           </div>
         )}
@@ -269,7 +269,7 @@ function CurrencyScanner() {
                 : 'bg-rose-950/40 border-rose-800/50 shadow-rose-900/20'}`}
             >
               <div>
-                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Gemini Vision Verdict</div>
+                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">SentinalAI Vision Verdict</div>
                 <div className={`text-3xl font-bold tracking-wider ${result.verdict === 'AUTHENTIC' ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {result.verdict === 'AUTHENTIC' ? '✓ AUTHENTIC' : '✗ SUSPECT'}
                 </div>
@@ -423,7 +423,7 @@ export default function App() {
       setAiResult(null);
       setAudioTranscript(null);
       setCopilotMode('thinking');
-      fetch('/api/v1/gemini/analyze-transcript', {
+      fetch('/api/v1/SentinalAI/analyze-transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: `[Channel: ${channelInput}, Suspect Phone: ${phoneInput}]\n\n${msgInput}` })
@@ -475,8 +475,8 @@ export default function App() {
     if (!r) return;
     const ringId = r.ring_id || r.ringId;
     const name   = r.location_name || r.locationName || ringId || r;
-    setCopilotHtml('<span class="text-amber-400 animate-pulse">Generating MHA Intelligence Brief via Gemini...</span>');
-    fetch(`/api/v1/gemini/ring-intelligence/${ringId}`)
+    setCopilotHtml('<span class="text-amber-400 animate-pulse">Generating MHA Intelligence Brief via SentinalAI...</span>');
+    fetch(`/api/v1/SentinalAI/ring-intelligence/${ringId}`)
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => {
         if (data.isFallback) throw new Error();
@@ -661,7 +661,7 @@ export default function App() {
             </div>
 
             {copilotMode === 'thinking' && (
-              <div className="bg-slate-900 border border-rose-900/40 rounded-xl p-4 text-xs font-mono text-emerald-400 animate-pulse shadow-xl">Gemini AI analysing threat vectors...</div>
+              <div className="bg-slate-900 border border-rose-900/40 rounded-xl p-4 text-xs font-mono text-emerald-400 animate-pulse shadow-xl">SentinalAI AI analysing threat vectors...</div>
             )}
             {copilotMode === 'result' && aiResult && (
               <div className="bg-slate-900 border border-rose-800/50 rounded-xl p-4 flex flex-col gap-3 shadow-xl shadow-rose-900/20">

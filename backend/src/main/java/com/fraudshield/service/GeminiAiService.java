@@ -64,10 +64,10 @@ import java.util.Map;
 @Slf4j
 public class GeminiAiService {
 
-    @Value("${google.ai.studio.url}")
-    private String geminiUrl;
+    @Value("${groq.api.url:https://api.groq.com/openai/v1}")
+    private String groqUrl;
 
-    @Value("${google.ai.studio.api.key}")
+    @Value("${groq.api.key}")
     private String apiKey;
 
     private final ObjectMapper objectMapper;
@@ -198,26 +198,14 @@ public class GeminiAiService {
         String promptText = "You are an RBI currency authentication specialist. Analyze this Indian currency note image. Return ONLY a valid JSON object with these exact fields: denomination (string like Rs.500), authenticityScore (integer 0-100), verdict (string: AUTHENTIC or SUSPECT), securityFeatures (array of objects each with name and status fields where status is PRESENT, ABSENT, or UNCLEAR), flaggedIssues (array of strings describing any problems found). Examine: security thread, watermark, microprint, colour shift strip, serial number format, and paper texture indicators.";
 
         Map<String, Object> body = Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(
-                                Map.of("inlineData", Map.of(
-                                        "mimeType", mimeType,
-                                        "data", base64Image
-                                )),
-                                Map.of("text", promptText)
+                "model", "meta-llama/llama-4-scout-17b-16e-instruct",
+                "messages", List.of(
+                        Map.of("role", "user", "content", List.of(
+                                Map.of("type", "text", "text", promptText),
+                                Map.of("type", "image_url", "image_url", Map.of("url", "data:" + mimeType + ";base64," + base64Image))
                         ))
                 ),
-                "generationConfig", Map.of(
-                        "temperature",       0.1,
-                        "maxOutputTokens",   2048,
-                        "responseMimeType",  "application/json"
-                ),
-                "safetySettings", List.of(
-                        Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE")
-                )
+                "temperature", 0.1
         );
 
         String raw = callGeminiWithRetry(body, "currency-analysis");
@@ -239,43 +227,51 @@ public class GeminiAiService {
     // =========================================================================
 
     public String analyzeAudio(byte[] audioBytes, String mimeType) {
-        log.info("Gemini audio analysis requested — size={} bytes", audioBytes.length);
-
-        String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
-
-        String promptText = "You are an Indian cybercrime audio analysis specialist. Listen to this phone call audio carefully. Transcribe every word spoken. Then analyze if this is a scam call targeting Indian citizens. Respond with ONLY a valid JSON object, no markdown, no explanation, using exactly these fields: transcript (string - the complete word for word transcription), isScam (boolean), scamType (string - one of: DIGITAL_ARREST, INVESTMENT_FRAUD, JOB_FRAUD, LOTTERY_FRAUD, LOAN_FRAUD, LEGITIMATE, UNKNOWN), confidence (integer 0 to 100), triggerPhrases (array of strings - exact phrases from the audio that indicate fraud), voiceAnalysis (string - one of: HUMAN_VOICE, AI_GENERATED_VOICE, UNCLEAR), recommendation (string - one sentence action recommendation).";
-
-        Map<String, Object> body = Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(
-                                Map.of("inlineData", Map.of(
-                                        "mimeType", mimeType,
-                                        "data", base64Audio
-                                )),
-                                Map.of("text", promptText)
-                        ))
-                ),
-                "generationConfig", Map.of(
-                        "temperature",       0.1,
-                        "maxOutputTokens",   2048,
-                        "responseMimeType",  "application/json"
-                ),
-                "safetySettings", List.of(
-                        Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE")
-                )
-        );
-
-        String raw = callGeminiWithRetry(body, "audio-analysis");
-
-        if (raw == null) return "{}";
+        log.info("Groq audio analysis requested — size={} bytes", audioBytes.length);
 
         try {
+            // Step 1: Transcribe using Groq Whisper
+            org.springframework.util.MultiValueMap<String, Object> parts = new org.springframework.util.LinkedMultiValueMap<>();
+            parts.add("file", new org.springframework.core.io.ByteArrayResource(audioBytes) {
+                @Override
+                public String getFilename() {
+                    return "audio.m4a"; 
+                }
+            });
+            parts.add("model", "whisper-large-v3-turbo");
+            parts.add("response_format", "json");
+
+            String transcriptJson = RestClient.create()
+                    .post()
+                    .uri(groqUrl + "/audio/transcriptions")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA)
+                    .body(parts)
+                    .retrieve()
+                    .body(String.class);
+
+            String transcribedText = objectMapper.readTree(transcriptJson).path("text").asText();
+            
+            // Step 2: Analyze transcribed text
+            String promptText = "You are an Indian cybercrime audio analysis specialist. The following is a transcript of an audio call. Analyze if this is a scam call targeting Indian citizens. Respond with ONLY a valid JSON object, no markdown, no explanation, using exactly these fields: transcript (string - the complete word for word transcription), isScam (boolean), scamType (string - one of: DIGITAL_ARREST, INVESTMENT_FRAUD, JOB_FRAUD, LOTTERY_FRAUD, LOAN_FRAUD, LEGITIMATE, UNKNOWN), confidence (integer 0 to 100), triggerPhrases (array of strings - exact phrases from the audio that indicate fraud), voiceAnalysis (string - one of: HUMAN_VOICE, AI_GENERATED_VOICE, UNCLEAR - default to HUMAN_VOICE since this is text), recommendation (string - one sentence action recommendation). TRANSCRIPT: " + transcribedText;
+
+            Map<String, Object> body = Map.of(
+                    "model", "llama-3.3-70b-versatile",
+                    "messages", List.of(
+                            Map.of("role", "user", "content", promptText)
+                    ),
+                    "temperature", 0.1,
+                    "response_format", Map.of("type", "json_object")
+            );
+
+            String raw = callGeminiWithRetry(body, "audio-analysis");
+
+            if (raw == null) return "{}";
+
             JsonNode root = objectMapper.readTree(raw);
             String text = extractTextFromGeminiResponse(root);
             return stripMarkdownFences(text);
+
         } catch (Exception ex) {
             log.error("Failed to parse audio analysis response: {}", ex.getMessage());
             return "{}";
@@ -526,13 +522,17 @@ public class GeminiAiService {
     }
 
     private String callGeminiWithRetry(Map<String, Object> body, String callLabel) {
-        for (int attempt = 1; attempt <= 2; attempt++) {
+        int maxAttempts = 4;
+        long delayMs = 1500;
+        
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                log.debug("Gemini {} — attempt {}/2", callLabel, attempt);
+                log.debug("Gemini {} — attempt {}/{}", callLabel, attempt, maxAttempts);
 
                 String response = RestClient.create()
                         .post()
-                        .uri(geminiUrl + ":generateContent?key=" + apiKey)
+                        .uri(groqUrl + "/chat/completions")
+                        .header("Authorization", "Bearer " + apiKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(body)
                         .retrieve()
@@ -543,12 +543,14 @@ public class GeminiAiService {
 
             } catch (RestClientException ex) {
                 log.warn("Gemini {} — attempt {} failed: {}", callLabel, attempt, ex.getMessage());
-                if (attempt == 2) {
-                    log.error("Gemini {} — both attempts failed, returning fallback", callLabel);
-                }
-                // Brief pause before retry (avoid hammering quota on transient errors)
-                if (attempt == 1) {
-                    try { Thread.sleep(500); } catch (InterruptedException ie) {
+                if (attempt == maxAttempts) {
+                    log.error("Gemini {} — all {} attempts failed, returning fallback", callLabel, maxAttempts);
+                } else {
+                    try { 
+                        log.info("Gemini {} — backing off for {}ms before next attempt...", callLabel, delayMs);
+                        Thread.sleep(delayMs); 
+                        delayMs *= 2; // Exponential backoff: 1500ms, 3000ms, 6000ms
+                    } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                     }
                 }
@@ -571,22 +573,12 @@ public class GeminiAiService {
      */
     private Map<String, Object> buildRequestBody(String prompt) {
         return Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(
-                                Map.of("text", prompt)
-                        ))
+                "model", "llama-3.3-70b-versatile",
+                "messages", List.of(
+                        Map.of("role", "user", "content", prompt)
                 ),
-                "generationConfig", Map.of(
-                        "temperature",       0.1,
-                        "maxOutputTokens",   2048,
-                        "responseMimeType",  "application/json"
-                ),
-                "safetySettings", List.of(
-                        Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
-                        Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE")
-                )
+                "temperature", 0.1,
+                "response_format", Map.of("type", "json_object")
         );
     }
 
@@ -602,12 +594,10 @@ public class GeminiAiService {
      */
     private String extractTextFromGeminiResponse(JsonNode root) {
         return root
-                .path("candidates")
+                .path("choices")
                 .get(0)
+                .path("message")
                 .path("content")
-                .path("parts")
-                .get(0)
-                .path("text")
                 .asText();
     }
 
