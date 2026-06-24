@@ -43,9 +43,13 @@ import java.util.Set;
  * RING-JH-01 and RING-DL-01 to demonstrate the graph's cross-ring linkage
  * detection capability — the "aha moment" for judges.
  */
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Configuration
-@Slf4j
 public class DataSeeder {
+    
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     @Bean
     CommandLineRunner initDatabase(FraudRingRepository repository,

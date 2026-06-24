@@ -16,7 +16,7 @@ services:
       - "7474:7474"   # Neo4j Browser UI  → http://localhost:7474
       - "7687:7687"   # Bolt protocol     ← Spring Data Neo4j connects here
     environment:
-      NEO4J_AUTH: neo4j/sentinelpassword
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-sentinelpassword}
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
@@ -28,9 +28,9 @@ services:
         - "CMD"
         - "cypher-shell"
         - "-u" 
-        - "neo4j"
+        - "${NEO4J_USER:-neo4j}"
         - "-p"
-        - "sentinelpassword"
+        - "${NEO4J_PASSWORD:-sentinelpassword}"
         - "RETURN 1"
       interval: 15s
       timeout: 10s
@@ -44,14 +44,14 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: fraudshield
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-fraudshield}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d fraudshield"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-fraudshield}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,11 +66,11 @@ services:
     environment:
       # Point to sibling containers by Docker service name
       SPRING_NEO4J_URI: bolt://sentinel-neo4j:7687
-      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
-      SPRING_NEO4J_AUTHENTICATION_PASSWORD: sentinelpassword
-      SPRING_DATASOURCE_URL: jdbc:postgresql://fraudshield-postgres:5432/fraudshield
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: ${NEO4J_USER:-neo4j}
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: ${NEO4J_PASSWORD:-sentinelpassword}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://fraudshield-postgres:5432/${POSTGRES_DB:-fraudshield}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       # Suppress the open-in-view warning
       SPRING_JPA_OPEN_IN_VIEW: "false"
       # Gemini API key — set in .env or export before running
