@@ -83,6 +83,10 @@ function CurrencyScanner() {
       const res = await fetch('/api/currency/analyze', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
+      // Validate that the response contains meaningful data from Gemini
+      if (!data.verdict || data.authenticityScore === undefined || data.authenticityScore === null) {
+        throw new Error('Gemini Vision returned an incomplete response. Please try again or check the API key.');
+      }
       setResult(data);
     } catch (e) {
       setError(e.message || 'Analysis failed. Check backend logs.');
@@ -91,7 +95,13 @@ function CurrencyScanner() {
     }
   };
 
-  const scoreColor = (s) => s >= 70 ? '#34d399' : s >= 40 ? '#f59e0b' : '#f43f5e';
+  // Single source of truth for score thresholds — legend and bar colour both derive from this
+  const SCORE_TIERS = [
+    { min: 70,  color: '#34d399', label: 'AUTHENTIC',  range: '70+' },
+    { min: 40,  color: '#f59e0b', label: 'UNCERTAIN',  range: '40–69' },
+    { min: 0,   color: '#f43f5e', label: 'SUSPECT',    range: 'Below 40' },
+  ];
+  const scoreColor = (s) => (SCORE_TIERS.find(t => s >= t.min) || SCORE_TIERS[SCORE_TIERS.length - 1]).color;
   const statusIcon = (s) => s === 'PRESENT' ? '✓' : s === 'ABSENT' ? '✗' : '?';
   const statusColor = (s) => s === 'PRESENT' ? 'text-emerald-400' : s === 'ABSENT' ? 'text-rose-400' : 'text-amber-400';
 
@@ -167,7 +177,11 @@ function CurrencyScanner() {
                       fd.append('image', file);
                       const apiRes = await fetch('/api/currency/analyze', { method: 'POST', body: fd });
                       if (!apiRes.ok) throw new Error(`Server error ${apiRes.status}`);
-                      setResult(await apiRes.json());
+                      const data = await apiRes.json();
+                      if (!data.verdict || data.authenticityScore === undefined || data.authenticityScore === null) {
+                        throw new Error('Gemini Vision returned an incomplete response. Please try again or check the API key.');
+                      }
+                      setResult(data);
                     } catch (e) {
                       setError(e.message || 'Sample analysis failed.');
                     } finally {
@@ -312,17 +326,22 @@ function CurrencyScanner() {
                       </div>
                     ))}
                   </div>
-                ) : (
+                ) : result.verdict === 'AUTHENTIC' ? (
                   <div className="flex gap-2 items-center bg-emerald-950/20 border border-emerald-900/30 rounded px-3 py-3">
                     <span className="text-emerald-400">✓</span>
                     <span className="text-[10px] text-emerald-300">No issues flagged — note appears authentic</span>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 items-start bg-rose-950/20 border border-rose-900/30 rounded px-3 py-3">
+                    <span className="text-rose-400 mt-0.5 flex-shrink-0">&#9888;</span>
+                    <span className="text-[10px] text-slate-300">Note flagged as suspect — one or more security features could not be verified. Treat with caution.</span>
                   </div>
                 )}
 
                 <div className="mt-auto pt-3 border-t border-slate-800">
                   <div className="text-[9px] text-slate-600 font-bold uppercase tracking-wider mb-2">Score Legend</div>
                   <div className="flex flex-col gap-1">
-                    {[['70+', '#34d399', 'AUTHENTIC'], ['40-69', '#f59e0b', 'UNCERTAIN'], ['Below 40', '#f43f5e', 'SUSPECT']].map(([range, color, label]) => (
+                    {SCORE_TIERS.map(({ range, color, label }) => (
                       <div key={range} className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                         <span className="text-[9px] font-mono text-slate-500">{range} — {label}</span>
