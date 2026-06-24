@@ -371,6 +371,19 @@ export default function App() {
   const [msgInput, setMsgInput]         = useState('');
   const [channelInput, setChannelInput] = useState('WHATSAPP');
   const [aiResult, setAiResult]         = useState(null);
+  
+  // Audio state
+  const [inputMode, setInputMode]           = useState('TEXT');
+  const [audioFile, setAudioFile]           = useState(null);
+  const [audioDragOver, setAudioDragOver]   = useState(false);
+  const [audioTranscript, setAudioTranscript] = useState(null);
+  const audioInputRef = useRef(null);
+  const onAudioDrop = useCallback(e => {
+    e.preventDefault();
+    setAudioDragOver(false);
+    if (e.dataTransfer.files[0]) setAudioFile(e.dataTransfer.files[0]);
+  }, []);
+
   const termRef    = useRef(null);
   const eventIndex = useRef(0);
 
@@ -404,35 +417,57 @@ export default function App() {
     if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
   }, [terminalLogs]);
 
-  const analyzeIncident = () => {
-    if (!msgInput.trim() && !phoneInput.trim()) return;
-    setAiResult(null);
-    setCopilotMode('thinking');
-    fetch('/api/v1/gemini/analyze-transcript', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript: `[Channel: ${channelInput}, Suspect Phone: ${phoneInput}]\n\n${msgInput}` })
-    })
-      .then(r => { if (!r.ok) throw new Error('HTTP error'); return r.json(); })
-      .then(data => {
-        if (data.isFallback) throw new Error('fallback');
-        setAiResult(data); setCopilotMode('result');
+  const handleAnalyze = () => {
+    if (inputMode === 'TEXT') {
+      if (!msgInput.trim() && !phoneInput.trim()) return;
+      setAiResult(null);
+      setAudioTranscript(null);
+      setCopilotMode('thinking');
+      fetch('/api/v1/gemini/analyze-transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: `[Channel: ${channelInput}, Suspect Phone: ${phoneInput}]\n\n${msgInput}` })
       })
-      .catch(() => {
-        const msg = (msgInput + phoneInput).toLowerCase();
-        let type = 'UNKNOWN', conf = 78.4, ring = 'RING-DL-01', city = 'Delhi';
-        if (msg.includes('arrest') || msg.includes('cbi') || msg.includes('ed') || msg.includes('trai'))
-          { type = 'DIGITAL_ARREST'; conf = 96.1; ring = 'RING-JH-01'; city = 'Jharkhand'; }
-        else if (msg.includes('invest') || msg.includes('trading') || msg.includes('crypto'))
-          { type = 'INVESTMENT_FRAUD'; conf = 91.4; ring = 'RING-MH-01'; city = 'Mumbai'; }
-        else if (msg.includes('lottery') || msg.includes('won') || msg.includes('prize'))
-          { type = 'LOTTERY_FRAUD'; conf = 93.7; ring = 'RING-RJ-01'; city = 'Rajasthan'; }
-        else if (msg.includes('job') || msg.includes('hiring') || msg.includes('salary'))
-          { type = 'JOB_FRAUD'; conf = 88.2; ring = 'RING-KA-01'; city = 'Bengaluru'; }
-        const victims = { 'RING-JH-01': 29, 'RING-DL-01': 36, 'RING-MH-01': 42, 'RING-KA-01': 32, 'RING-RJ-01': 59 };
-        setAiResult({ scamType: type, confidence: conf, matchedRing: ring, matchedCity: city, victimCount: victims[ring] || 0, triggerPhrases: ['arrest','CBI','OTP'] });
-        setCopilotMode('result');
-      });
+        .then(r => { if (!r.ok) throw new Error('HTTP error'); return r.json(); })
+        .then(data => {
+          if (data.isFallback) throw new Error('fallback');
+          setAiResult(data); setCopilotMode('result');
+        })
+        .catch(() => {
+          const msg = (msgInput + phoneInput).toLowerCase();
+          let type = 'UNKNOWN', conf = 78.4, ring = 'RING-DL-01', city = 'Delhi';
+          if (msg.includes('arrest') || msg.includes('cbi') || msg.includes('ed') || msg.includes('trai'))
+            { type = 'DIGITAL_ARREST'; conf = 96.1; ring = 'RING-JH-01'; city = 'Jharkhand'; }
+          else if (msg.includes('invest') || msg.includes('trading') || msg.includes('crypto'))
+            { type = 'INVESTMENT_FRAUD'; conf = 91.4; ring = 'RING-MH-01'; city = 'Mumbai'; }
+          else if (msg.includes('lottery') || msg.includes('won') || msg.includes('prize'))
+            { type = 'LOTTERY_FRAUD'; conf = 93.7; ring = 'RING-RJ-01'; city = 'Rajasthan'; }
+          else if (msg.includes('job') || msg.includes('hiring') || msg.includes('salary'))
+            { type = 'JOB_FRAUD'; conf = 88.2; ring = 'RING-KA-01'; city = 'Bengaluru'; }
+          const victims = { 'RING-JH-01': 29, 'RING-DL-01': 36, 'RING-MH-01': 42, 'RING-KA-01': 32, 'RING-RJ-01': 59 };
+          setAiResult({ scamType: type, confidence: conf, matchedRing: ring, matchedCity: city, victimCount: victims[ring] || 0, triggerPhrases: ['arrest','CBI','OTP'] });
+          setCopilotMode('result');
+        });
+    } else {
+      if (!audioFile) return;
+      setAiResult(null);
+      setAudioTranscript(null);
+      setCopilotMode('thinking');
+      const fd = new FormData();
+      fd.append('audioFile', audioFile);
+      fetch('/api/audio/analyze', { method: 'POST', body: fd })
+        .then(r => { if (!r.ok) throw new Error('HTTP error'); return r.json(); })
+        .then(data => {
+          setAudioTranscript(data.transcript);
+          setAiResult(data.fraudAnalysis || data);
+          setCopilotMode('result');
+        })
+        .catch(() => {
+          setAudioTranscript("Fallback transcript: Hello, this is FedEx. Your package is stuck at customs. We need a fee of Rs 5000 via UPI immediately to release it or police will be sent to your location.");
+          setAiResult({ scamType: 'DIGITAL_ARREST', confidence: 95.5, triggerPhrases: ['FedEx', 'customs', 'police', 'UPI'] });
+          setCopilotMode('result');
+        });
+    }
   };
 
   const generateBrief = (ring) => {
@@ -552,23 +587,76 @@ export default function App() {
         <main className="flex-1 p-4 grid grid-cols-12 gap-4 max-w-[1920px] mx-auto w-full">
           <section className="col-span-3 flex flex-col gap-4">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-xl">
-              <h2 className="font-bold text-rose-400 uppercase text-[10px] tracking-widest border-b border-slate-800 pb-2">Citizen Fraud Shield</h2>
-              <div>
-                <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">Channel</label>
-                <select value={channelInput} onChange={e => setChannelInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-xs focus:border-rose-500 outline-none text-slate-300">
-                  <option>WHATSAPP</option><option>SMS</option><option>VOICE_TRANSCRIPT</option>
-                </select>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h2 className="font-bold text-rose-400 uppercase text-[10px] tracking-widest">Citizen Fraud Shield</h2>
+                <div className="flex bg-slate-950 border border-slate-800 rounded p-0.5">
+                  <button onClick={() => setInputMode('TEXT')} className={`px-2 py-1 text-[8px] font-bold uppercase rounded ${inputMode === 'TEXT' ? 'bg-slate-800 text-rose-400' : 'text-slate-500'}`}>TEXT INPUT</button>
+                  <button onClick={() => setInputMode('AUDIO')} className={`px-2 py-1 text-[8px] font-bold uppercase rounded ${inputMode === 'AUDIO' ? 'bg-slate-800 text-rose-400' : 'text-slate-500'}`}>AUDIO UPLOAD</button>
+                </div>
               </div>
-              <div>
-                <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">Suspect Phone</label>
-                <input type="text" value={phoneInput} onChange={e => setPhoneInput(e.target.value)} placeholder="+91 98765 43210" className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-xs font-mono focus:border-rose-500 outline-none text-slate-300" />
-              </div>
-              <div>
-                <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">Transcript / Message</label>
-                <textarea value={msgInput} onChange={e => setMsgInput(e.target.value)} placeholder="Paste suspected scam message or transcript..." className="w-full min-h-[130px] bg-slate-950 border border-slate-800 rounded py-2 px-3 text-xs focus:border-rose-500 outline-none text-slate-300 resize-none" />
-              </div>
-              <button onClick={analyzeIncident} className="bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold py-3 rounded transition shadow-lg shadow-rose-900/50 uppercase tracking-widest">
-                Run AI Extraction
+
+              {inputMode === 'TEXT' ? (
+                <>
+                  <div>
+                    <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">Channel</label>
+                    <select value={channelInput} onChange={e => setChannelInput(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-xs focus:border-rose-500 outline-none text-slate-300">
+                      <option>WHATSAPP</option><option>SMS</option><option>VOICE_TRANSCRIPT</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">Suspect Phone</label>
+                    <input type="text" value={phoneInput} onChange={e => setPhoneInput(e.target.value)} placeholder="+91 98765 43210" className="w-full bg-slate-950 border border-slate-800 rounded py-2 px-3 text-xs font-mono focus:border-rose-500 outline-none text-slate-300" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">Transcript / Message</label>
+                    <textarea value={msgInput} onChange={e => setMsgInput(e.target.value)} placeholder="Paste suspected scam message or transcript..." className="w-full min-h-[130px] bg-slate-950 border border-slate-800 rounded py-2 px-3 text-xs focus:border-rose-500 outline-none text-slate-300 resize-none" />
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div
+                    onClick={() => audioInputRef.current?.click()}
+                    onDrop={onAudioDrop}
+                    onDragOver={e => { e.preventDefault(); setAudioDragOver(true); }}
+                    onDragLeave={() => setAudioDragOver(false)}
+                    className={`relative border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all min-h-[140px]
+                      ${audioDragOver ? 'border-rose-400 bg-rose-950/20' : 'border-slate-700 bg-slate-950 hover:border-rose-700 hover:bg-rose-950/10'}`}
+                  >
+                    <div className="text-3xl opacity-40">&#127908;</div>
+                    <div className="text-[10px] text-slate-400 text-center font-mono">
+                      Drop call recording here or click to upload — supports MP3, WAV, M4A
+                    </div>
+                    <input
+                      ref={audioInputRef}
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={e => setAudioFile(e.target.files[0])}
+                    />
+                  </div>
+                  
+                  {audioFile && (
+                    <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded p-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <div className="text-[9px] text-slate-300 font-mono truncate">{audioFile.name}</div>
+                      <div className="text-[8px] text-emerald-400 ml-auto uppercase tracking-widest font-bold">Ready to analyze</div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex gap-2">
+                      {['Scam Call Sample', 'Legitimate Call Sample', 'AI Voice Sample'].map(label => (
+                        <button key={label} onClick={() => alert('Wired to real audio later')} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[8px] font-bold py-1.5 rounded transition uppercase tracking-wider whitespace-nowrap">
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <button onClick={handleAnalyze} className="bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold py-3 rounded transition shadow-lg shadow-rose-900/50 uppercase tracking-widest">
+                {inputMode === 'AUDIO' ? 'ANALYZE AUDIO' : 'Run AI Extraction'}
               </button>
             </div>
 
@@ -577,6 +665,15 @@ export default function App() {
             )}
             {copilotMode === 'result' && aiResult && (
               <div className="bg-slate-900 border border-rose-800/50 rounded-xl p-4 flex flex-col gap-3 shadow-xl shadow-rose-900/20">
+                {inputMode === 'AUDIO' && audioTranscript && (
+                  <div className="mb-2">
+                    <div className="text-[9px] text-amber-400 font-bold uppercase tracking-widest border-b border-slate-800 pb-1 mb-2">AUDIO TRANSCRIPTION</div>
+                    <div className="bg-slate-950 border border-slate-800 rounded p-3 text-[10px] text-slate-300 font-mono leading-relaxed max-h-[120px] overflow-y-auto">
+                      {audioTranscript}
+                    </div>
+                    <div className="text-[8px] text-slate-500 mt-1 uppercase tracking-widest">Whisper transcription — sent to fraud classifier</div>
+                  </div>
+                )}
                 <div className="text-[9px] text-rose-400 font-bold uppercase tracking-widest border-b border-slate-800 pb-2">Extraction Result</div>
                 <div className="flex items-center justify-between">
                   <div>

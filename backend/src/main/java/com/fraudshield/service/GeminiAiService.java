@@ -109,6 +109,7 @@ public class GeminiAiService {
             return parseTranscriptResult(raw);
         } catch (Exception ex) {
             log.error("Failed to parse transcript analysis response: {}", ex.getMessage());
+            log.error("Raw Gemini response was: {}", raw);
             return transcriptFallback();
         }
     }
@@ -210,6 +211,12 @@ public class GeminiAiService {
                         "temperature",       0.1,
                         "maxOutputTokens",   2048,
                         "responseMimeType",  "application/json"
+                ),
+                "safetySettings", List.of(
+                        Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE")
                 )
         );
 
@@ -223,6 +230,54 @@ public class GeminiAiService {
             return stripMarkdownFences(text);
         } catch (Exception ex) {
             log.error("Failed to parse currency analysis response: {}", ex.getMessage());
+            return "{}";
+        }
+    }
+
+    // =========================================================================
+    // 5. AUDIO ANALYSIS
+    // =========================================================================
+
+    public String analyzeAudio(byte[] audioBytes, String mimeType) {
+        log.info("Gemini audio analysis requested — size={} bytes", audioBytes.length);
+
+        String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
+
+        String promptText = "You are an Indian cybercrime audio analysis specialist. Listen to this phone call audio carefully. Transcribe every word spoken. Then analyze if this is a scam call targeting Indian citizens. Respond with ONLY a valid JSON object, no markdown, no explanation, using exactly these fields: transcript (string - the complete word for word transcription), isScam (boolean), scamType (string - one of: DIGITAL_ARREST, INVESTMENT_FRAUD, JOB_FRAUD, LOTTERY_FRAUD, LOAN_FRAUD, LEGITIMATE, UNKNOWN), confidence (integer 0 to 100), triggerPhrases (array of strings - exact phrases from the audio that indicate fraud), voiceAnalysis (string - one of: HUMAN_VOICE, AI_GENERATED_VOICE, UNCLEAR), recommendation (string - one sentence action recommendation).";
+
+        Map<String, Object> body = Map.of(
+                "contents", List.of(
+                        Map.of("parts", List.of(
+                                Map.of("inlineData", Map.of(
+                                        "mimeType", mimeType,
+                                        "data", base64Audio
+                                )),
+                                Map.of("text", promptText)
+                        ))
+                ),
+                "generationConfig", Map.of(
+                        "temperature",       0.1,
+                        "maxOutputTokens",   2048,
+                        "responseMimeType",  "application/json"
+                ),
+                "safetySettings", List.of(
+                        Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE")
+                )
+        );
+
+        String raw = callGeminiWithRetry(body, "audio-analysis");
+
+        if (raw == null) return "{}";
+
+        try {
+            JsonNode root = objectMapper.readTree(raw);
+            String text = extractTextFromGeminiResponse(root);
+            return stripMarkdownFences(text);
+        } catch (Exception ex) {
+            log.error("Failed to parse audio analysis response: {}", ex.getMessage());
             return "{}";
         }
     }
@@ -525,6 +580,12 @@ public class GeminiAiService {
                         "temperature",       0.1,
                         "maxOutputTokens",   2048,
                         "responseMimeType",  "application/json"
+                ),
+                "safetySettings", List.of(
+                        Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
+                        Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE")
                 )
         );
     }
