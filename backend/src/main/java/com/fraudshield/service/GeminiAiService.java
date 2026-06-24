@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -174,6 +175,55 @@ public class GeminiAiService {
         } catch (Exception ex) {
             log.warn("Justification parse failed, using default: {}", ex.getMessage());
             return defaultScoreJustification(breakdown);
+        }
+    }
+
+    // =========================================================================
+    // 4. CURRENCY IMAGE ANALYSIS
+    // =========================================================================
+
+    /**
+     * Analyses an image of an Indian currency note to determine if it is counterfeit.
+     *
+     * @param imageBytes raw bytes of the image file
+     * @param mimeType MIME type of the image (e.g., "image/jpeg")
+     * @return a JSON string containing the analysis result
+     */
+    public String analyzeCurrencyImage(byte[] imageBytes, String mimeType) {
+        log.info("Gemini currency image analysis requested — size={} bytes", imageBytes.length);
+
+        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+
+        String promptText = "You are an RBI currency authentication specialist. Analyze this Indian currency note image. Return ONLY a valid JSON object with these exact fields: denomination (string like Rs.500), authenticityScore (integer 0-100), verdict (string: AUTHENTIC or SUSPECT), securityFeatures (array of objects each with name and status fields where status is PRESENT, ABSENT, or UNCLEAR), flaggedIssues (array of strings describing any problems found). Examine: security thread, watermark, microprint, colour shift strip, serial number format, and paper texture indicators.";
+
+        Map<String, Object> body = Map.of(
+                "contents", List.of(
+                        Map.of("parts", List.of(
+                                Map.of("inlineData", Map.of(
+                                        "mimeType", mimeType,
+                                        "data", base64Image
+                                )),
+                                Map.of("text", promptText)
+                        ))
+                ),
+                "generationConfig", Map.of(
+                        "temperature",       0.1,
+                        "maxOutputTokens",   2048,
+                        "responseMimeType",  "application/json"
+                )
+        );
+
+        String raw = callGeminiWithRetry(body, "currency-analysis");
+
+        if (raw == null) return "{}";
+
+        try {
+            JsonNode root = objectMapper.readTree(raw);
+            String text = extractTextFromGeminiResponse(root);
+            return stripMarkdownFences(text);
+        } catch (Exception ex) {
+            log.error("Failed to parse currency analysis response: {}", ex.getMessage());
+            return "{}";
         }
     }
 
@@ -417,7 +467,10 @@ public class GeminiAiService {
      */
     private String callGeminiWithRetry(String prompt, String callLabel) {
         Map<String, Object> body = buildRequestBody(prompt);
+        return callGeminiWithRetry(body, callLabel);
+    }
 
+    private String callGeminiWithRetry(Map<String, Object> body, String callLabel) {
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 log.debug("Gemini {} — attempt {}/2", callLabel, attempt);
