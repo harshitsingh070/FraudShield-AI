@@ -46,7 +46,7 @@ class GeminiAiServiceTest {
         };
         // Reflectively set the private fields for the invalid-key scenario
         try {
-            var urlField = GeminiAiService.class.getDeclaredField("geminiUrl");
+            var urlField = GeminiAiService.class.getDeclaredField("groqUrl");
             urlField.setAccessible(true);
             urlField.set(service, "https://localhost:0/invalid");   // guaranteed unreachable
 

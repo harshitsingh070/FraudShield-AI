@@ -126,6 +126,9 @@ public class DataSeeder {
                         MuleAccount ma006 = mule("960060080090", "Kotak Mahindra Bank", "KKBK0006789",
                                         28_500_000, 19, "Maharashtra", "2024-06-01");
 
+                        MuleAccount maCross = mule("MULE-CROSS-001", "Axis Bank", "UTIB0009999",
+                                        8_950_000, 47, "Maharashtra", "2024-09-10");
+
                         FraudRing mumbaiSyndicate = ring(
                                         "RING-MH-01",
                                         "Mumbai Investment Fraud Syndicate",
@@ -137,7 +140,7 @@ public class DataSeeder {
                                         42,
                                         "2024-05-14",
                                         "2024-11-25",
-                                        Set.of(ma005, ma006));
+                                        Set.of(ma005, ma006, maCross));
                         repository.save(mumbaiSyndicate);
                         log.info("  ✅ RING-MH-01  Mumbai Investment Syndicate | threat=7.8 | ₹6.35 Cr | 42 victims");
 
@@ -161,7 +164,7 @@ public class DataSeeder {
                                         59,
                                         "2024-04-10",
                                         "2024-11-15",
-                                        Set.of(ma009, ma010));
+                                        Set.of(ma009, ma010, maCross, ma004));
                         repository.save(rajasthanLottery);
                         log.info("  ✅ RING-RJ-01  Rajasthan Lottery Ring       | threat=5.4 | ₹0.80 Cr | 59 victims");
 
@@ -185,7 +188,7 @@ public class DataSeeder {
                                         32,
                                         "2024-08-20",
                                         "2024-11-27",
-                                        Set.of(ma011, ma012));
+                                        Set.of(ma011, ma012, ma001));
                         repository.save(bengaluruJobFraud);
                         log.info("  ✅ RING-KA-01  Bengaluru Job Fraud Network  | threat=6.1 | ₹1.20 Cr | 32 victims");
 

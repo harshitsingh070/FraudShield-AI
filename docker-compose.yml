@@ -75,8 +75,6 @@ services:
       SPRING_JPA_OPEN_IN_VIEW: "false"
       # Gemini API key — set in .env or export before running
       GOOGLE_AI_STUDIO_API_KEY: ${GOOGLE_AI_STUDIO_API_KEY:-YOUR_GEMINI_API_KEY_HERE}
-      # HuggingFace API key — set in .env (used for Whisper audio transcription)
-      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
     depends_on:
       sentinel-neo4j:
         condition: service_healthy

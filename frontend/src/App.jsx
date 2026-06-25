@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import ForceGraph2D from 'react-force-graph-2d';
 
 // ── Fallback mock data if backend is offline ─────────────────────────────────
 const MOCK_SUMMARY = {
@@ -38,6 +39,173 @@ const TERMINAL_EVENTS = [
 
 function getTime() {
   return new Date().toLocaleTimeString('en-IN', { hour12: false });
+}
+
+// ── Investigation Workbench Component ────────────────────────────────────────
+function InvestigationWorkbench() {
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    fetch('/api/v1/graph/network')
+      .then(r => r.json())
+      .then(data => setGraphData(data))
+      .catch(e => console.error('Failed to load graph data', e));
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setDimensions({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const getNodeColor = (node) => {
+    return node._indexColor || node._INDEXCOLOR || (node.group === 'ring' ? '#E24B4A' : node.group === 'mule' ? '#EF9F27' : '#378ADD');
+  };
+
+  const renderNodeDetails = (node) => {
+    if (!node) return <div className="text-slate-500 text-xs italic">Click a node to view its details</div>;
+
+    const isRing = node.group === 'ring' || node.type === 'FRAUD_RING' || node.type === 'FraudRing';
+    const isMule = node.group === 'mule' || node.type === 'MULE_ACCOUNT' || node.type === 'MuleAccount';
+    const isPhone = node.group === 'phone' || node.type === 'PHONE_NUMBER' || node.type === 'PhoneNumber';
+    
+    const badgeClass = isRing ? 'bg-rose-950/50 text-rose-400 border-rose-900/50' 
+                     : isMule ? 'bg-orange-950/50 text-orange-400 border-orange-900/50' 
+                     : isPhone ? 'bg-blue-950/50 text-blue-400 border-blue-900/50' 
+                     : 'bg-slate-800 text-slate-400 border-slate-700';
+
+    const displayName = node.name || node.label || node.id;
+
+    // Filter out internal react-force-graph properties
+    const excludeKeys = ['id', 'name', 'label', 'type', 'group', 'x', 'y', 'vx', 'vy', 'index', 'fx', 'fy', '_indexColor', '_INDEXCOLOR', '__indexColor'];
+    const otherProps = Object.keys(node).filter(k => !excludeKeys.includes(k));
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <span className={`px-2 py-1 border rounded text-[10px] font-bold uppercase ${badgeClass}`}>
+            {node.type}
+          </span>
+        </div>
+        
+        <div className="text-xl font-bold text-slate-200">
+          {displayName}
+        </div>
+
+        {isRing && (
+          <div className="bg-rose-950/20 border border-rose-900/30 p-3 rounded-lg flex flex-col gap-2 mb-2">
+            {node.threatScore && <div><span className="text-rose-400 font-bold text-[9px] uppercase tracking-wider block mb-0.5">Threat Score</span><span className="text-rose-200 text-lg font-mono">{node.threatScore}</span></div>}
+            {node.victimCount && <div><span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider block mb-0.5">Victim Count</span><span className="text-slate-200 font-mono">{node.victimCount}</span></div>}
+            {node.financialImpact && <div><span className="text-slate-400 font-bold text-[9px] uppercase tracking-wider block mb-0.5">Financial Impact</span><span className="text-slate-200 font-mono">₹{node.financialImpact}</span></div>}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 overflow-y-auto pr-1" style={{ maxHeight: '300px' }}>
+          {otherProps.map(key => {
+            if (isRing && (key === 'threatScore' || key === 'victimCount' || key === 'financialImpact')) return null;
+            return (
+              <div key={key} className="text-xs bg-slate-950 border border-slate-800 p-2 rounded">
+                <span className="text-slate-500 uppercase text-[9px] font-bold tracking-wider">{key}</span><br />
+                <span className="text-slate-300 font-mono break-all">{String(node[key])}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex-1 p-4 grid grid-cols-12 gap-4 max-w-[1920px] mx-auto w-full h-[calc(100vh-80px)]">
+      <section className="col-span-9 flex flex-col gap-4 h-full">
+        <div ref={containerRef} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex-1 relative">
+          {dimensions.width > 0 && (
+            <ForceGraph2D
+              width={dimensions.width}
+              height={dimensions.height}
+              graphData={graphData}
+              nodeRelSize={6}
+              nodeColor={getNodeColor}
+              nodeLabel={node => `${node.group || node.type} — ${node.label || node.name || node.id}`}
+              nodeCanvasObject={(node, ctx, globalScale) => {
+                if (typeof node.x !== 'number' || typeof node.y !== 'number') return;
+
+                const r = 6;
+                const x = node.x;
+                const y = node.y;
+
+                const baseColor = node._indexColor || node._INDEXCOLOR || 
+                  (node.group === 'ring' || node.type === 'FRAUD_RING' || node.type === 'FraudRing' ? '#E24B4A' : 
+                   node.group === 'mule' || node.type === 'MULE_ACCOUNT' || node.type === 'MuleAccount' ? '#EF9F27' : '#378ADD');
+
+                // Draw glowing orb (radial gradient)
+                const gradient = ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
+                gradient.addColorStop(0, '#ffffff');       // bright center highlight
+                gradient.addColorStop(0.3, baseColor);     // base solid color
+                gradient.addColorStop(1, 'rgba(0,0,0,0.6)'); // deep shadow on the edge
+
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, 2 * Math.PI, false);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // Draw subtle neon outer stroke
+                ctx.strokeStyle = baseColor;
+                ctx.lineWidth = 1.5 / globalScale;
+                ctx.stroke();
+
+                // Draw labels only for FraudRings
+                if (node.group === 'ring' || node.type === 'FRAUD_RING' || node.type === 'FraudRing') {
+                  const label = node.name || node.label || node.id;
+                  const fontSize = 11 / globalScale;
+                  ctx.font = `bold ${fontSize}px Sans-Serif`;
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'top';
+                  
+                  // Label background for readability
+                  const textWidth = ctx.measureText(label).width;
+                  const bgWidth = textWidth + (4 / globalScale);
+                  const bgHeight = fontSize + (4 / globalScale);
+                  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                  ctx.fillRect(x - bgWidth / 2, y + r + 3 - (2 / globalScale), bgWidth, bgHeight);
+
+                  // Label text
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+                  ctx.fillText(label, x, y + r + 3);
+                }
+              }}
+              onNodeClick={node => setSelectedNode(node)}
+              linkDirectionalArrowLength={3.5}
+              linkDirectionalArrowRelPos={1}
+              linkDirectionalParticles={2}
+              linkDirectionalParticleWidth={1.5}
+              linkDirectionalParticleSpeed={0.006}
+              linkDirectionalParticleColor={() => '#ef4444'}
+              linkColor={() => '#1e293b'}
+              backgroundColor="#020617"
+            />
+          )}
+        </div>
+      </section>
+
+      <section className="col-span-3 flex flex-col gap-4 h-full">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col gap-4 shadow-xl h-full">
+          <h2 className="font-bold text-amber-400 uppercase text-[10px] tracking-widest border-b border-slate-800 pb-2">
+            Node Details
+          </h2>
+          {renderNodeDetails(selectedNode)}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 // ── Currency Scanner Component ───────────────────────────────────────────────
@@ -423,7 +591,7 @@ export default function App() {
       setAiResult(null);
       setAudioTranscript(null);
       setCopilotMode('thinking');
-      fetch('/api/v1/SentinalAI/analyze-transcript', {
+      fetch('/api/v1/gemini/analyze-transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript: `[Channel: ${channelInput}, Suspect Phone: ${phoneInput}]\n\n${msgInput}` })
@@ -476,7 +644,7 @@ export default function App() {
     const ringId = r.ring_id || r.ringId;
     const name   = r.location_name || r.locationName || ringId || r;
     setCopilotHtml('<span class="text-amber-400 animate-pulse">Generating MHA Intelligence Brief via SentinalAI...</span>');
-    fetch(`/api/v1/SentinalAI/ring-intelligence/${ringId}`)
+    fetch(`/api/v1/gemini/ring-intelligence/${ringId}`)
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => {
         if (data.isFallback) throw new Error();
@@ -554,7 +722,7 @@ export default function App() {
 
         {/* Tab navigation */}
         <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-1">
-          {[['dashboard','COMMAND CENTRE'],['currency','CURRENCY CHECK']].map(([id, label]) => (
+          {[['dashboard','COMMAND CENTRE'],['graph','INVESTIGATION WORKBENCH'],['currency','CURRENCY CHECK']].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -581,6 +749,9 @@ export default function App() {
 
       {/* Currency Tab */}
       {activeTab === 'currency' && <CurrencyScanner />}
+
+      {/* Investigation Workbench Tab */}
+      {activeTab === 'graph' && <InvestigationWorkbench />}
 
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && (

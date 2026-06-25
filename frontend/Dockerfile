@@ -4,7 +4,7 @@ WORKDIR /app
 # Copy manifests first — Docker layer cache avoids re-installing deps on code-only changes
 COPY package.json package-lock.json ./
 
-RUN npm ci --prefer-offline
+RUN npm install --prefer-offline
 
 # Copy remaining source after deps are cached
 COPY . .

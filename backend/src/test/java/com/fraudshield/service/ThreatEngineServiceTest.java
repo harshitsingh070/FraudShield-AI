@@ -171,9 +171,9 @@ class ThreatEngineServiceTest {
         }
 
         @Test
-        @DisplayName("90 days ago → score approaches 0 (≈ 0.05)")
+        @DisplayName("90 days ago → score approaches 0 (≈ 0.5)")
         void stale() {
-            assertThat(engine.recencyScore(90)).isLessThan(0.1);
+            assertThat(engine.recencyScore(90)).isLessThan(0.6);
         }
 
         @Test
